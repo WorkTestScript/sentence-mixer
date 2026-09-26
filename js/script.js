@@ -147,11 +147,11 @@ function initSpeechRecognition() {
         }
       }
 
-      // Check for "save it" command
-      if (normalizedTranscript.includes('save it') ||
-        normalizedTranscript.includes('save it.') ||
-        normalizedTranscript.includes('save it!') ||
-        normalizedTranscript.includes('save it?')) {
+      // Check for "keep it" command
+      if (normalizedTranscript.includes('keep it') ||
+        normalizedTranscript.includes('keep it.') ||
+        normalizedTranscript.includes('keep it!') ||
+        normalizedTranscript.includes('keep it?')) {
 
         // Trigger save sentence logic (same as trainer repeat button)
         saveSentenceToLocalStorageNoAdvance()

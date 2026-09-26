@@ -258,8 +258,12 @@ class VoiceEngine {
       this.triggerOnSpeechEndCallback();
     };
 
+    let fallbackStarted = false;
     const fallbackToSystemVoice = () => {
-      if (cancelled) return;
+      // Both audio.onerror and the rejected play() promise may report the
+      // same failure. Only one of them should start the system voice.
+      if (cancelled || fallbackStarted) return;
+      fallbackStarted = true;
       this._googleAudio = null;
       console.log("Google voice unavailable, falling back to the system voice.");
       this.speakWithSystemVoice(text, onEnd);

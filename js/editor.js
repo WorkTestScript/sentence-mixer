@@ -17,10 +17,12 @@ const saveButton = $("save-button")
 const increaseBtn = $("increase-btn")
 const decreaseBtn = $("decrease-btn")
 const clearListBtn = $("clear-list-btn")
-const searchBtn = $("search-btn")
-const searchModal = $(".search-modal")
-const searchInput = $("search-input")
-const searchSubmitBtn = $("search-submit-btn")
+const searchInput = $("navbar-search-input")
+const searchSuggestionsModal = $(".search-suggestions-modal")
+const searchSuggestionsList = $("search-suggestions")
+const searchSuggestionsStatus = $("search-suggestions-status")
+let currentSearchResults = []
+const FORM_HIDDEN_STORAGE_KEY = "createdListFormHidden"
 
 const STORAGE_KEY = "createdSentences"
 
@@ -313,26 +315,66 @@ function deleteSentence() {
    Search
    ============================================================ */
 
-function performSearch() {
+function updateSearchSuggestions() {
   const term = searchInput.value.trim().toLowerCase()
   if (!term) {
-    showInformationModal("Введіть текст для пошуку")
+    currentSearchResults = []
+    searchSuggestionsModal.style.display = "none"
     return
   }
 
-  const sentences = readSentences()
-  const regex = new RegExp(`(?:^|\\s)${term}(?:$|\\s)`, "i")
-  const found = sentences.findIndex((s) => regex.test(s.en) || regex.test(s.ua))
+  currentSearchResults = readSentences()
+    .map((sentence, index) => ({ sentence, index }))
+    .filter(({ sentence }) =>
+      String(sentence.en || "").toLowerCase().includes(term) ||
+      String(sentence.ua || "").toLowerCase().includes(term)
+    )
+    .sort((first, second) => {
+      const firstStarts = String(first.sentence.en || "").toLowerCase().startsWith(term) ||
+        String(first.sentence.ua || "").toLowerCase().startsWith(term)
+      const secondStarts = String(second.sentence.en || "").toLowerCase().startsWith(term) ||
+        String(second.sentence.ua || "").toLowerCase().startsWith(term)
+      return Number(secondStarts) - Number(firstStarts)
+    })
+    .slice(0, 15)
 
-  searchModal.style.display = "none"
-  searchInput.value = ""
-
-  if (found !== -1) {
-    editSentence(found)
+  searchSuggestionsList.innerHTML = ""
+  if (!currentSearchResults.length) {
+    searchSuggestionsStatus.textContent = "Нічого не знайдено"
   } else {
-    showInformationModal("Нічого не знайдено")
+    searchSuggestionsStatus.textContent = `Знайдено варіантів: ${currentSearchResults.length}`
+    currentSearchResults.forEach(({ sentence }, resultIndex) => {
+      const item = document.createElement("li")
+      const button = document.createElement("button")
+      const english = document.createElement("span")
+      const ukrainian = document.createElement("span")
+
+      button.type = "button"
+      button.dataset.resultIndex = resultIndex
+      english.className = "search-suggestion-en"
+      english.textContent = sentence.en || ""
+      ukrainian.className = "search-suggestion-ua"
+      ukrainian.textContent = sentence.ua || ""
+
+      button.append(english, ukrainian)
+      item.appendChild(button)
+      searchSuggestionsList.appendChild(item)
+    })
   }
+
+  searchSuggestionsModal.style.display = "flex"
 }
+
+function selectSearchResult(resultIndex) {
+  const result = currentSearchResults[resultIndex]
+  if (!result) return
+
+  searchSuggestionsModal.style.display = "none"
+  searchInput.value = ""
+  currentSearchResults = []
+  editSentence(result.index)
+}
+
 
 /* ============================================================
    Event listeners
@@ -354,7 +396,12 @@ decreaseBtn.addEventListener("click", () => {
 saveButton.addEventListener("click", saveData)
 clearListBtn?.addEventListener("click", () => showDeleteModal())
 hideFormBtn?.addEventListener("click", () => {
-  document.querySelector(".form-wrapper").classList.toggle("hide")
+  const formWrapper = $("sentence-form-wrapper")
+  if (!formWrapper) return
+
+  const isHidden = formWrapper.classList.toggle("hide")
+  localStorage.setItem(FORM_HIDDEN_STORAGE_KEY, String(isHidden))
+  hideFormBtn.textContent = isHidden ? "Показати форму" : "Сховати форму"
 })
 
 editModalCloseBtn?.addEventListener("click", closeEditModal)
@@ -362,28 +409,31 @@ editModalSaveBtn?.addEventListener("click", saveChanges)
 editModalDeleteBtn?.addEventListener("click", () => showDeleteModal(currentEditIndex))
 deleteModalRemoveBtn?.addEventListener("click", deleteSentence)
 
-searchBtn?.addEventListener("click", () => {
-  searchModal.style.display = "flex"
-  searchInput.focus()
+searchInput?.addEventListener("input", updateSearchSuggestions)
+searchInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault()
+    selectSearchResult(0)
+  } else if (e.key === "Escape") {
+    searchSuggestionsModal.style.display = "none"
+  }
 })
 
-searchModal?.querySelector(".close-modal-btn")?.addEventListener("click", () => {
-  searchModal.style.display = "none"
-  searchInput.value = ""
+searchSuggestionsList?.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-result-index]")
+  if (button) selectSearchResult(Number(button.dataset.resultIndex))
 })
 
-searchSubmitBtn?.addEventListener("click", performSearch)
-searchInput?.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") performSearch()
+$("#search-suggestions-close")?.addEventListener("click", () => {
+  searchSuggestionsModal.style.display = "none"
 })
 
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey && e.altKey) {
-    if (searchModal.style.display === "flex" || editModal.style.display === "flex") return
+    if (editModal.style.display === "flex") return
     e.preventDefault()
-    searchInput.value = ""
-    searchModal.style.display = "flex"
     searchInput.focus()
+    searchInput.select()
   }
 
   if (e.key === "ArrowUp") window.scrollBy(0, -window.innerHeight)
@@ -411,3 +461,13 @@ window.addEventListener("storage", (e) => {
 
 renderForm()
 renderSentences()
+
+const shouldHideForm = localStorage.getItem(FORM_HIDDEN_STORAGE_KEY) !== "false"
+const sentenceFormWrapper = $("sentence-form-wrapper")
+sentenceFormWrapper?.classList.toggle("hide", shouldHideForm)
+if (localStorage.getItem(FORM_HIDDEN_STORAGE_KEY) === null) {
+  localStorage.setItem(FORM_HIDDEN_STORAGE_KEY, "true")
+}
+if (hideFormBtn) {
+  hideFormBtn.textContent = shouldHideForm ? "Показати форму" : "Сховати форму"
+}

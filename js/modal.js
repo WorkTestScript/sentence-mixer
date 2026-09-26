@@ -62,7 +62,10 @@
   }
 
   const showSaveModal = () => showModal($(".save-modal"))
-  const showLoadReplaceModal = () => showModal($(".load-replace-modal"))
+  const showLoadReplaceModal = () => {
+    updateCreatedListLoadButton()
+    showModal($(".load-replace-modal"))
+  }
   const showLoadMergeModal = () => showModal($(".load-merge-modal"))
   const showJsonConfirmationModal = () => showModal($(".json-confirmation-modal"))
   const showJsonAddConfirmationModal = () => showModal($(".json-add-confirmation-modal"))
@@ -114,6 +117,10 @@
     const dataName = event.target.dataset.storage
     const loadMode = event.target.dataset.mode
     const file = event.target.files[0]
+    if (event.target.id === "training-list-file") {
+      const fileName = $("#training-list-file-name")
+      if (fileName) fileName.textContent = file?.name || "Файл не вибрано"
+    }
     if (!file) return
 
     if (file.type !== "text/plain" && file.type !== "application/json") {
@@ -162,15 +169,43 @@
     reader.readAsText(file)
   }
 
+  function updateCreatedListLoadButton() {
+    const button = $("#load-created-list-btn")
+    const status = $("#created-list-load-status")
+    if (!button || !status) return
+
+    const created = readStorage(STORAGE_KEYS.created)
+    button.disabled = created.length === 0
+    status.textContent = created.length
+      ? `Знайдено ${created.length} речень у списку зі сторінки «Створити список».`
+      : "На сторінці «Створити список» ще немає збережених речень."
+  }
+
+  function loadCreatedListForTraining() {
+    const created = readStorage(STORAGE_KEYS.created)
+    if (!created.length) {
+      showInformationModal("Спочатку створіть або завантажте список на сторінці «Створити список».")
+      return
+    }
+
+    writeStorage(STORAGE_KEYS.sentences, normalizeDataFormat(created))
+    localStorage.removeItem(STORAGE_KEYS.used)
+    closeLoadReplaceModal()
+    showInformationModal("Створений список завантажено для тренування.")
+    setTimeout(() => location.reload(), 900)
+  }
+
   /* ---------- Save to file ---------- */
 
   function saveToFile(event) {
-    const storageKey = event.target.dataset.storage
+    const storageKey = event.currentTarget.dataset.storage
     const sentences = readStorage(storageKey)
     const fileNameInput = $("#file-name")
-    const fileName = fileNameInput?.value.trim()
-      ? `${fileNameInput.value.trim()}.json`
-      : `Sentence list ${new Date().toLocaleString()}.json`
+    const requestedName = fileNameInput?.value.trim()
+    const safeName = requestedName
+      ? requestedName.replace(/\.json$/i, "").replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-").replace(/[. ]+$/g, "")
+      : `Sentence list ${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}`
+    const fileName = `${safeName || "Sentence list"}.json`
 
     if (!sentences.length) {
       closeSaveModal()
@@ -185,10 +220,16 @@
       type: "application/json;charset=utf-8",
     })
     const link = document.createElement("a")
-    link.href = URL.createObjectURL(blob)
+    const objectUrl = URL.createObjectURL(blob)
+    link.href = objectUrl
     link.download = fileName
+    link.style.display = "none"
+    document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(link.href)
+    setTimeout(() => {
+      URL.revokeObjectURL(objectUrl)
+      link.remove()
+    }, 1000)
 
     if (storageKey === STORAGE_KEYS.saved) {
       localStorage.removeItem(STORAGE_KEYS.saved)
@@ -370,6 +411,7 @@
   })
 
   $(".load-replace-open-modal")?.addEventListener("click", showLoadReplaceModal)
+  $("#load-created-list-btn")?.addEventListener("click", loadCreatedListForTraining)
   $(".load-merge-open-modal")?.addEventListener("click", showLoadMergeModal)
   $(".save-selected-open-modal")?.addEventListener("click", showSaveModal)
   $("#save-selected-to-file-btn")?.addEventListener("click", saveToFile)

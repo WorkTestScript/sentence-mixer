@@ -17,20 +17,24 @@
         <ul>
             <li><a href="../index.html">Тренування</a></li>
             <li><a href="editor.html" class="active">Створити список</a></li>
-            <li><a href="list.html">Оглянути список</a></li>
-            <li><button class="load-replace-open-modal">Список окремо</button></li>
-            <li><button class="load-merge-open-modal">Додати до існуючого</button></li>
+            <li><button class="load-merge-open-modal">Додати список</button></li>
+            <li><button id="ai-list-open">AI список</button></li>
             <li><button id="clear-list-btn">Очистити список</button></li>
             <li><button class="save-selected-open-modal">Зберегти список</button></li>
-            <li><button id="search-btn">Пошук</button></li>
-            <li><button id="increase-btn">+ 1</button></li>
-            <li><button id="decrease-btn">− 1</button></li>
-            <li><button id="hide-form-btn">Сховати форму</button></li>
+            <li><input type="search" id="navbar-search-input" class="navbar-search" placeholder="Пошук..." aria-label="Пошук у списку"></li>
+            <li class="navbar-form-controls">
+                <span class="navbar-form-controls-label">Форма</span>
+                <div class="navbar-form-controls-actions">
+                    <button id="increase-btn">+ 1</button>
+                    <button id="decrease-btn">− 1</button>
+                    <button id="hide-form-btn">Показати форму</button>
+                </div>
+            </li>
         </ul>
     </nav>
 
     <div class="editor-page">
-        <div class="form-wrapper">
+        <div class="form-wrapper" id="sentence-form-wrapper">
             <h2>Нове речення</h2>
             <div id="form-container"></div>
             <div class="form-buttons-editor">
@@ -41,6 +45,17 @@
 
         <h2>Збережені речення</h2>
         <div id="sentences-container"></div>
+    </div>
+
+    <div class="search-suggestions-modal modal" role="dialog" aria-modal="true" aria-labelledby="search-suggestions-title">
+        <div class="modal-content">
+            <h3 id="search-suggestions-title">Знайдені варіанти</h3>
+            <p id="search-suggestions-status" aria-live="polite"></p>
+            <ul id="search-suggestions" class="search-suggestions-list"></ul>
+            <div class="modal-control">
+                <button id="search-suggestions-close" type="button">Закрити</button>
+            </div>
+        </div>
     </div>
 
     <div class="edit-modal" id="edit-modal">
@@ -68,22 +83,43 @@
         </div>
     </div>
 
-    <div class="load-replace-modal modal">
+    <div class="load-merge-modal modal">
         <div class="modal-content">
-            <h3>Завантажити окремий список</h3>
+            <h3>Додати список</h3>
             <div class="modal-control">
-                <input type="file" class="file-input" accept=".txt,.json" data-storage="createdSentences" data-mode="replace" />
+                <input type="file" class="file-input" accept=".txt,.json" data-storage="createdSentences" data-mode="merge" />
                 <button class="close-modal-btn">Скасувати</button>
             </div>
         </div>
     </div>
 
-    <div class="load-merge-modal modal">
+    <div id="ai-list-modal" class="modal ai-list-modal" role="dialog" aria-modal="true" aria-labelledby="ai-list-title">
         <div class="modal-content">
-            <h3>Додати до існуючого списку</h3>
+            <h3 id="ai-list-title">Створити список за допомогою AI</h3>
+            <p>Вставте англійські слова або речення, по одному в рядок. За один раз можна додати до 50 рядків.</p>
+            <label for="ai-list-input">Слова чи речення</label>
+            <div class="ai-input-editor">
+                <div id="ai-list-highlight" aria-hidden="true"></div>
+                <textarea id="ai-list-input" rows="10" placeholder="carry out&#10;common&#10;break the ice"></textarea>
+            </div>
+            <p id="ai-list-status" role="status" aria-live="polite"></p>
             <div class="modal-control">
-                <input type="file" class="file-input" accept=".txt,.json" data-storage="createdSentences" data-mode="merge" />
-                <button class="close-modal-btn">Скасувати</button>
+                <button id="ai-list-cancel" type="button">Скасувати</button>
+                <button id="ai-api-key-open" type="button">API key</button>
+                <button id="ai-list-generate" type="button">Генерувати</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ai-api-key-modal" class="modal ai-api-key-modal" role="dialog" aria-modal="true" aria-labelledby="ai-api-key-title">
+        <div class="modal-content">
+            <h3 id="ai-api-key-title">Gemini API key</h3>
+            <label for="gemini-api-key">API key</label>
+            <input id="gemini-api-key" type="password" autocomplete="off" placeholder="Вставте API key">
+            <p class="ai-key-help">Ключ зберігається лише у localStorage цього браузера. Для запитів без оплати використовуйте ключ проєкту Free Tier. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Отримати API key у Google AI Studio</a></p>
+            <div class="modal-control">
+                <button id="ai-api-key-cancel" type="button">Скасувати</button>
+                <button id="ai-api-key-save" type="button">Зберегти</button>
             </div>
         </div>
     </div>
@@ -93,19 +129,8 @@
             <h3>Зберегти список</h3>
             <input type="text" id="file-name" placeholder="File name">
             <div class="modal-control">
-                <button id="save-selected-to-file-btn" data-storage="createdSentences">Зберегти</button>
+                <button id="save-selected-to-file-btn" type="button" data-storage="createdSentences">Зберегти</button>
                 <button class="close-modal-btn">Скасувати</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="search-modal modal">
-        <div class="modal-content">
-            <h3>Пошук</h3>
-            <input type="text" id="search-input" placeholder="Введіть текст для пошуку">
-            <div class="modal-control">
-                <button class="close-modal-btn">Скасувати</button>
-                <button id="search-submit-btn">Пошук</button>
             </div>
         </div>
     </div>
@@ -145,6 +170,7 @@
     <script src="../js/theme.js"></script>
     <script src="../js/modal.js" defer></script>
     <script src="../js/editor.js" defer></script>
+    <script src="../js/ai-list.js" defer></script>
 </body>
 
 </html>

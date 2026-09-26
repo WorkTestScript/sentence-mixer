@@ -89,7 +89,7 @@
                     <li><span>come up</span>Показати підказку</li>
                     <li><span>hide it</span>Приховати підказку</li>
                     <li><span>next point</span>Пропустити речення</li>
-                    <li><span>save it</span>Зберегти речення</li>
+                    <li><span>keep it</span>Зберегти речення</li>
                     <li><span>say it</span>Проголосити речення</li>
                 </ul>
             </div>
@@ -110,8 +110,23 @@
     <div class="load-replace-modal modal">
         <div class="modal-content">
             <h3>Завантажити список речень</h3>
+            <div class="load-options-grid">
+                <section class="load-option-card">
+                    <h4>Завантажити список з файлу</h4>
+                    <p>Виберіть файл зі списком речень у форматі JSON.</p>
+                    <div class="file-picker">
+                        <input type="file" id="training-list-file" class="file-input visually-hidden-file" accept=".txt,.json" data-storage="sentences" />
+                        <label class="file-picker-button" for="training-list-file">Вибрати файл</label>
+                        <span id="training-list-file-name">Файл не вибрано</span>
+                    </div>
+                </section>
+                <section class="load-option-card">
+                    <h4>Завантажити створений список</h4>
+                    <p id="created-list-load-status">Список із розділу «Створити список» буде використано для тренування.</p>
+                    <button id="load-created-list-btn" type="button">Завантажити створений список</button>
+                </section>
+            </div>
             <div class="modal-control">
-                <input type="file" class="file-input" accept=".txt,.json" data-storage="sentences" />
                 <button class="close-modal-btn">Скасувати</button>
             </div>
         </div>
