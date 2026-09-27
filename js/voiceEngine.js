@@ -16,21 +16,24 @@
  * restrict it at any time - but it is free, needs no sign-up, and works in
  * any browser that can play audio, not just Chrome.
  *
- * The accent (British vs American) is selected the same way third-party
- * tools like the gTTS library do it: by requesting the audio from a
- * different Google domain (co.uk vs com) rather than via a language code,
- * since this endpoint's "tl" only understands the base "en".
+ * Important: this must be the translate.googleapis.com domain, not
+ * translate.google.com. The googleapis.com host doesn't 404 requests
+ * carrying a Referer from another site the way translate.google.com does,
+ * which matters once the page is actually deployed somewhere (e.g. GitHub
+ * Pages) rather than opened locally. The accent (British vs American) is
+ * just the region-qualified "tl" value (en-GB / en-US) - no domain-swapping
+ * trick needed.
  */
 const GOOGLE_VOICES = [
-  { id: "google-en-GB", label: "Google (British English)", lang: "en", tld: "co.uk" },
-  { id: "google-en-US", label: "Google (American English)", lang: "en", tld: "com" },
+  { id: "google-en-GB", label: "Google (British English)", locale: "en-GB" },
+  { id: "google-en-US", label: "Google (American English)", locale: "en-US" },
 ]
 
 // Google's TTS endpoint silently truncates or rejects very long requests
 // (historically, right around 100 characters). Text longer than this is
 // split into several chunks (preferring to break at sentence/clause
 // boundaries) and played back to back.
-const GOOGLE_TTS_MAX_CHUNK_LENGTH = 100
+const GOOGLE_TTS_MAX_CHUNK_LENGTH = 110
 
 class VoiceEngine {
   constructor() {
@@ -205,12 +208,27 @@ class VoiceEngine {
   }
 
   /**
+   * Build the Google TTS request URL for one chunk of text.
+   * @param {{locale:string}} voiceInfo
+   * @param {string} text
+   * @param {number} retryCount - >0 adds a cache-busting param for a retry
+   */
+  getGoogleTTSUrl(voiceInfo, text, retryCount = 0) {
+    const retryParam = retryCount ? `&retry=${Date.now()}-${retryCount}` : "";
+    return (
+      `https://translate.googleapis.com/translate_tts` +
+      `?ie=UTF-8&client=tw-ob&tl=${voiceInfo.locale}&q=${encodeURIComponent(text)}${retryParam}`
+    );
+  }
+
+  /**
    * Speak using Google Translate's free "listen" audio endpoint - the same
-   * unofficial trick tools like the gTTS library use. Falls back to the
-   * system voice automatically if a request fails (offline, blocked,
-   * rate-limited, endpoint changed, etc.), so speech never just goes silent.
+   * unofficial trick tools like the gTTS library use. Retries a failed
+   * chunk once (with a cache-busting param, in case of a transient glitch),
+   * then falls back to the system voice automatically, so speech never
+   * just goes silent.
    * @param {string} text - Text to speak
-   * @param {{id:string,label:string,lang:string,tld:string}} voiceInfo
+   * @param {{id:string,label:string,locale:string}} voiceInfo
    * @param {function} onEnd - Callback function when speech ends
    */
   speakWithGoogle(text, voiceInfo, onEnd = null) {
@@ -235,10 +253,9 @@ class VoiceEngine {
 
     const audio = new Audio();
     this._googleAudio = audio;
-    // Google's endpoint returns 404 if the request carries a Referer header
-    // pointing anywhere other than translate.google.com itself - which the
-    // browser normally adds automatically for a cross-origin request from
-    // our own page. Suppressing it avoids that 404.
+    // Belt-and-suspenders: suppress the Referer header this page would
+    // otherwise send. Shouldn't matter on the googleapis.com endpoint the
+    // way it did on translate.google.com, but there's no downside to it.
     audio.referrerPolicy = "no-referrer";
     audio.setAttribute("referrerpolicy", "no-referrer");
     audio.volume = Number.isFinite(volume) ? volume : 1;
@@ -265,40 +282,65 @@ class VoiceEngine {
       this.triggerOnSpeechEndCallback();
     };
 
-    let fallbackStarted = false;
+    let chunkRetryCount = 0;
+
     const fallbackToSystemVoice = () => {
-      // Both audio.onerror and the rejected play() promise may report the
-      // same failure. Only one of them should start the system voice.
-      if (cancelled || fallbackStarted) return;
-      fallbackStarted = true;
+      if (cancelled) return;
       this._googleAudio = null;
       console.log("Google voice unavailable, falling back to the system voice.");
       this.speakWithSystemVoice(text, onEnd);
     };
 
-    const playNext = () => {
+    const loadCurrentChunk = () => {
       if (cancelled) return;
-      if (index >= chunks.length) {
-        finish();
-        return;
-      }
-      const chunkText = chunks[index];
-      index++;
-      audio.src =
-        `https://translate.google.${voiceInfo.tld}/translate_tts` +
-        `?ie=UTF-8&client=tw-ob&tl=${voiceInfo.lang}&q=${encodeURIComponent(chunkText)}`;
+      audio.src = this.getGoogleTTSUrl(voiceInfo, chunks[index], chunkRetryCount);
       audio.playbackRate = effectiveRate;
       audio.play().then(() => {
         // Some browsers only honor playbackRate once playback has actually
         // started, so set it once more right after play() resolves.
         audio.playbackRate = effectiveRate;
-      }).catch(fallbackToSystemVoice);
+      }).catch(handleChunkFailure);
     };
 
-    audio.onended = playNext;
-    audio.onerror = fallbackToSystemVoice;
+    let failureHandled = false;
+    const handleChunkFailure = () => {
+      // audio.onerror and a rejected play() promise can both report the
+      // same underlying failure - only act on the first one.
+      if (cancelled || failureHandled) return;
+      failureHandled = true;
 
-    playNext();
+      if (chunkRetryCount === 0) {
+        // One retry with a cache-busting param, in case this was just a
+        // transient glitch rather than the endpoint being unreachable.
+        chunkRetryCount = 1;
+        failureHandled = false;
+        loadCurrentChunk();
+        return;
+      }
+
+      fallbackToSystemVoice();
+    };
+
+    const playCurrentChunk = () => {
+      if (cancelled) return;
+      if (index >= chunks.length) {
+        finish();
+        return;
+      }
+      chunkRetryCount = 0;
+      failureHandled = false;
+      loadCurrentChunk();
+    };
+
+    const advanceToNextChunk = () => {
+      index++;
+      playCurrentChunk();
+    };
+
+    audio.onended = advanceToNextChunk;
+    audio.onerror = handleChunkFailure;
+
+    playCurrentChunk();
   }
 
   /**
