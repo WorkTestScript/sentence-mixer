@@ -35,6 +35,22 @@ const GOOGLE_VOICES = [
 // boundaries) and played back to back.
 const GOOGLE_TTS_MAX_CHUNK_LENGTH = 110
 
+// Retry/stall-recovery timing, ported from a sibling app that has been
+// reading long texts aloud via this same free Google endpoint in
+// production for months without complaints. The core idea: a failed or
+// stuck request for a chunk is retried with a fresh cache-busting param,
+// indefinitely, rather than given up on after one or two tries - most
+// failures against this endpoint are transient.
+const GOOGLE_TTS_RETRY_DELAY_MS = 1000 // retry delay when a request fails outright (network error, rejected play())
+const GOOGLE_TTS_STALL_MIN_MS = 8000 // shortest time to wait before assuming a "silently stuck" chunk needs retrying
+const GOOGLE_TTS_STALL_MAX_MS = 25000 // longest such wait, for long chunks
+// Not present in the reference app (which retries forever) - added purely
+// as an outer safety net so a single utterance can't retry literally
+// forever if Google is genuinely unreachable (e.g. no internet at all).
+// High enough that it should never be hit in the normal transient-failure
+// case this logic is designed to recover from.
+const GOOGLE_TTS_MAX_RETRIES_PER_UTTERANCE = 20
+
 class VoiceEngine {
   constructor() {
     this.voiceSelect = null;
@@ -222,11 +238,31 @@ class VoiceEngine {
   }
 
   /**
+   * Estimate how long a chunk should take to speak, so a request that
+   * neither finishes nor errors out (silently stuck) still gets retried
+   * instead of leaving the app waiting forever. Same estimate/formula as
+   * the reference app: roughly 12 characters/second, scaled by speed, plus
+   * a fixed buffer, clamped to a sane min/max.
+   * @param {string} chunkText
+   * @param {number} rate
+   */
+  getGoogleStallDelay(chunkText, rate) {
+    if (!chunkText) return GOOGLE_TTS_STALL_MIN_MS;
+    const estimate = ((chunkText.length / 12) * 1000) / rate;
+    return Math.min(
+      GOOGLE_TTS_STALL_MAX_MS,
+      Math.max(GOOGLE_TTS_STALL_MIN_MS, Math.ceil(estimate + 4000))
+    );
+  }
+
+  /**
    * Speak using Google Translate's free "listen" audio endpoint - the same
-   * unofficial trick tools like the gTTS library use. Retries a failed
-   * chunk once (with a cache-busting param, in case of a transient glitch),
-   * then falls back to the system voice automatically, so speech never
-   * just goes silent.
+   * unofficial trick tools like the gTTS library use. A chunk that fails
+   * outright (network error, rejected play()) or goes silently stuck
+   * (no 'ended'/'error' within its expected duration) is retried in place
+   * with a fresh cache-busting param, rather than given up on quickly -
+   * most failures against this endpoint are transient. Only falls back to
+   * the system voice as a last resort, after many retries.
    * @param {string} text - Text to speak
    * @param {{id:string,label:string,locale:string}} voiceInfo
    * @param {function} onEnd - Callback function when speech ends
@@ -234,8 +270,8 @@ class VoiceEngine {
   speakWithGoogle(text, voiceInfo, onEnd = null) {
     this.stop();
 
-    const chunks = this.splitTextForGoogleTTS(text);
-    if (chunks.length === 0) {
+    const queue = this.splitTextForGoogleTTS(text);
+    if (queue.length === 0) {
       if (onEnd) onEnd();
       this.notifySpeechEnd();
       this.triggerOnSpeechEndCallback();
@@ -248,99 +284,107 @@ class VoiceEngine {
     // control here (unlike the system voice) - only speed (via
     // playbackRate, which will also shift pitch slightly, same as
     // speeding up/slowing down a recording) and volume.
-
     const effectiveRate = Number.isFinite(rate) && rate > 0 ? rate : 1;
 
     const audio = new Audio();
     this._googleAudio = audio;
-    // Belt-and-suspenders: suppress the Referer header this page would
-    // otherwise send. Shouldn't matter on the googleapis.com endpoint the
-    // way it did on translate.google.com, but there's no downside to it.
     audio.referrerPolicy = "no-referrer";
     audio.setAttribute("referrerpolicy", "no-referrer");
     audio.volume = Number.isFinite(volume) ? volume : 1;
-    // Some browsers reset playbackRate back to 1 whenever a new src is
-    // loaded, so it also needs to be set as a default and reapplied on
-    // every chunk (see playNext and the loadedmetadata listener below),
-    // not just once here.
     audio.defaultPlaybackRate = effectiveRate;
     audio.playbackRate = effectiveRate;
     audio.addEventListener("loadedmetadata", () => {
       audio.playbackRate = effectiveRate;
     });
 
-    let index = 0;
     let cancelled = false;
+    let recoveryTimer = null;
+    let currentChunk = null;
+    let retryCountForChunk = 0;
+    let totalRetryCount = 0;
+
+    const clearRecoveryTimer = () => {
+      clearTimeout(recoveryTimer);
+      recoveryTimer = null;
+    };
+
     this._cancelGoogleSpeech = () => {
       cancelled = true;
+      clearRecoveryTimer();
     };
 
     const finish = () => {
+      clearRecoveryTimer();
       this._googleAudio = null;
       if (onEnd) onEnd();
       this.notifySpeechEnd();
       this.triggerOnSpeechEndCallback();
     };
 
-    let chunkRetryCount = 0;
-
     const fallbackToSystemVoice = () => {
       if (cancelled) return;
+      clearRecoveryTimer();
       this._googleAudio = null;
-      console.log("Google voice unavailable, falling back to the system voice.");
+      console.log("Google voice not responding after repeated retries, falling back to the system voice.");
       this.speakWithSystemVoice(text, onEnd);
     };
 
-    const loadCurrentChunk = () => {
-      if (cancelled) return;
-      audio.src = this.getGoogleTTSUrl(voiceInfo, chunks[index], chunkRetryCount);
+    const scheduleStallRecovery = () => {
+      clearRecoveryTimer();
+      recoveryTimer = setTimeout(retryCurrentChunk, this.getGoogleStallDelay(currentChunk, effectiveRate));
+    };
+
+    const scheduleQuickRetry = () => {
+      clearRecoveryTimer();
+      recoveryTimer = setTimeout(retryCurrentChunk, GOOGLE_TTS_RETRY_DELAY_MS);
+    };
+
+    const loadAndPlay = () => {
+      audio.src = this.getGoogleTTSUrl(voiceInfo, currentChunk, retryCountForChunk);
       audio.playbackRate = effectiveRate;
+      scheduleStallRecovery();
       audio.play().then(() => {
         // Some browsers only honor playbackRate once playback has actually
         // started, so set it once more right after play() resolves.
         audio.playbackRate = effectiveRate;
-      }).catch(handleChunkFailure);
+      }).catch(scheduleQuickRetry);
     };
 
-    let failureHandled = false;
-    const handleChunkFailure = () => {
-      // audio.onerror and a rejected play() promise can both report the
-      // same underlying failure - only act on the first one.
-      if (cancelled || failureHandled) return;
-      failureHandled = true;
+    const retryCurrentChunk = () => {
+      if (cancelled || !currentChunk) return;
 
-      if (chunkRetryCount === 0) {
-        // One retry with a cache-busting param, in case this was just a
-        // transient glitch rather than the endpoint being unreachable.
-        chunkRetryCount = 1;
-        failureHandled = false;
-        loadCurrentChunk();
+      totalRetryCount++;
+      if (totalRetryCount > GOOGLE_TTS_MAX_RETRIES_PER_UTTERANCE) {
+        fallbackToSystemVoice();
         return;
       }
 
-      fallbackToSystemVoice();
+      retryCountForChunk++;
+      audio.pause();
+      loadAndPlay();
     };
 
-    const playCurrentChunk = () => {
+    const playNextChunk = () => {
       if (cancelled) return;
-      if (index >= chunks.length) {
+      if (!queue.length) {
         finish();
         return;
       }
-      chunkRetryCount = 0;
-      failureHandled = false;
-      loadCurrentChunk();
+      currentChunk = queue.shift();
+      retryCountForChunk = 0;
+      loadAndPlay();
     };
 
-    const advanceToNextChunk = () => {
-      index++;
-      playCurrentChunk();
-    };
+    audio.addEventListener("ended", () => {
+      if (cancelled) return;
+      clearRecoveryTimer();
+      currentChunk = null;
+      playNextChunk();
+    });
+    audio.addEventListener("error", retryCurrentChunk);
+    audio.addEventListener("stalled", retryCurrentChunk);
 
-    audio.onended = advanceToNextChunk;
-    audio.onerror = handleChunkFailure;
-
-    playCurrentChunk();
+    playNextChunk();
   }
 
   /**
