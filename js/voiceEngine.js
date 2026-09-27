@@ -290,6 +290,7 @@ class VoiceEngine {
     this._googleAudio = audio;
     audio.referrerPolicy = "no-referrer";
     audio.setAttribute("referrerpolicy", "no-referrer");
+    audio.preload = "auto";
     audio.volume = Number.isFinite(volume) ? volume : 1;
     audio.defaultPlaybackRate = effectiveRate;
     audio.playbackRate = effectiveRate;
