@@ -26,10 +26,11 @@ const GOOGLE_VOICES = [
   { id: "google-en-US", label: "Google (American English)", lang: "en", tld: "com" },
 ]
 
-// Google's TTS endpoint silently truncates or rejects very long requests.
-// Text longer than this is split into several chunks (preferring to break
-// at sentence/clause boundaries) and played back to back.
-const GOOGLE_TTS_MAX_CHUNK_LENGTH = 180
+// Google's TTS endpoint silently truncates or rejects very long requests
+// (historically, right around 100 characters). Text longer than this is
+// split into several chunks (preferring to break at sentence/clause
+// boundaries) and played back to back.
+const GOOGLE_TTS_MAX_CHUNK_LENGTH = 100
 
 class VoiceEngine {
   constructor() {
@@ -234,6 +235,12 @@ class VoiceEngine {
 
     const audio = new Audio();
     this._googleAudio = audio;
+    // Google's endpoint returns 404 if the request carries a Referer header
+    // pointing anywhere other than translate.google.com itself - which the
+    // browser normally adds automatically for a cross-origin request from
+    // our own page. Suppressing it avoids that 404.
+    audio.referrerPolicy = "no-referrer";
+    audio.setAttribute("referrerpolicy", "no-referrer");
     audio.volume = Number.isFinite(volume) ? volume : 1;
     // Some browsers reset playbackRate back to 1 whenever a new src is
     // loaded, so it also needs to be set as a default and reapplied on
