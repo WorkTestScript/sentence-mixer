@@ -203,7 +203,7 @@ function initSpeechRecognition() {
   }
 
   recognition.onerror = function (event) {
-    console.error('Speech recognition error:', event.error)
+    if (event.error !== 'no-speech') console.error('Speech recognition error:', event.error)
 
     // Handle permission denied specifically
     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
@@ -216,18 +216,10 @@ function initSpeechRecognition() {
       }
       showInformationModal('Доступ до мікрофона заборонено. Будь ласка, дозвольте доступ до мікрофона в налаштуваннях браузера та оновіть сторінку.')
     } else if (event.error === 'no-speech') {
-      // Ignore no-speech errors, just restart listening
-      if (permissionGranted && isRecording) {
-        setTimeout(() => {
-          if (recognition && permissionGranted) {
-            try {
-              recognition.start()
-            } catch (e) {
-              console.log('Recognition restart failed:', e)
-            }
-          }
-        }, 100)
-      }
+      // Nothing to do here: the browser always fires onend right after a
+      // no-speech error, and onend already restarts recognition (and
+      // respects suppressAutoRestart). Restarting here as well caused a
+      // second start() call -> "recognition has already started".
     }
   }
 
@@ -241,7 +233,8 @@ function initSpeechRecognition() {
           try {
             recognition.start()
           } catch (e) {
-            console.log('Recognition restart failed:', e)
+            // "already started" just means it is running - not an error
+            if (e.name !== 'InvalidStateError') console.log('Recognition restart failed:', e)
           }
         }
       }, 100)
