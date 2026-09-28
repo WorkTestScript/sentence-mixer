@@ -304,7 +304,7 @@ function pauseRecognitionForSpeech() {
 // Restart the recognition engine after the app has finished speaking.
 // Waits a short moment first so any trailing audio/echo from the speech
 // has already died out before the mic starts listening again.
-function resumeRecognitionAfterSpeech(delay = 250) {
+function resumeRecognitionAfterSpeech(delay = 500) {
   if (!recognition || !isRecording) return
   setTimeout(() => {
     suppressAutoRestart = false
@@ -597,7 +597,7 @@ function hidePopup() {
   // Give the microphone a brief moment before trusting new results again,
   // so leftover audio from the answer we just spoke doesn't get written
   // into the (already cleared) field for the next sentence.
-  ignoreRecognitionUntil = Date.now() + 250
+  ignoreRecognitionUntil = Date.now() + 500
   resumeRecognitionAfterSpeech()
   popup.style.display = "none"
   userInput.focus()
@@ -845,7 +845,7 @@ function onSpeechFinished() {
   }
   setTimeout(() => {
     setVoiceEngineActive(false);
-    ignoreRecognitionUntil = Date.now() + 250
+    ignoreRecognitionUntil = Date.now() + 500
     // hidePopup() (above) already resumes recognition when it runs; when
     // hintMode is true it doesn't run, so resume it here instead.
     if (hintMode) {
@@ -853,5 +853,5 @@ function onSpeechFinished() {
     }
     // userInput.value = '';
     // inputOverlay.innerHTML = '';
-  }, 250);
+  }, 500);
 }
