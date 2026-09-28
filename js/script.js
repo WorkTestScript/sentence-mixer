@@ -37,6 +37,25 @@ let permissionGranted = false // Track if permission was granted
 let isListening = false // Track if we're currently listening
 let lastTranscript = "" // Store the last recognized transcript
 let voiceEngineActive = false;
+// True once the microphone is actually listening again after being paused
+// for speech. Together with voiceEngineActive it drives the "busy"
+// indicator in the hint popup (see refreshSpeechIndicator).
+let micReady = false
+
+const speechIndicator = document.getElementById("voice-status")
+
+// Shows the indicator while the app is speaking or, if the mic is on, until
+// the mic is listening again - i.e. while a spoken command would be lost.
+function refreshSpeechIndicator() {
+  if (!speechIndicator) return
+  const busy = voiceEngineActive || (isRecording && !micReady)
+  speechIndicator.classList.toggle("active", busy)
+}
+
+function setVoiceEngineActive(value) {
+  voiceEngineActive = value
+  refreshSpeechIndicator()
+}
 // Timestamp until which incoming speech-recognition results should be
 // ignored. This swallows results that the microphone picks up right after
 // the app finishes speaking (either genuine mic echo of the TTS voice, or
@@ -116,10 +135,12 @@ function initSpeechRecognition() {
 
   recognition.onstart = function () {
     handledCommandResults.clear()
+    micReady = true
     isRecording = true
     voiceInputActive = true
     permissionGranted = true
     isListening = true
+    refreshSpeechIndicator()
     if (voiceInputBtn) {
       voiceInputBtn.classList.add('recording')
       voiceInputBtn.title = 'Зупинити запис'
@@ -268,6 +289,8 @@ function startVoiceRecording() {
 function pauseRecognitionForSpeech() {
   if (!recognition || !isRecording) return
   suppressAutoRestart = true
+  micReady = false
+  refreshSpeechIndicator()
   try {
     recognition.stop()
   } catch (e) {
@@ -565,7 +588,7 @@ function showPopup(text, autoClose = false) {
 
 function hidePopup() {
   voiceEngine.stop()
-  voiceEngineActive = false;
+  setVoiceEngineActive(false);
   // Give the microphone a brief moment before trusting new results again,
   // so leftover audio from the answer we just spoke doesn't get written
   // into the (already cleared) field for the next sentence.
@@ -579,14 +602,14 @@ function hidePopup() {
 }
 
 function speak(text, autoClose = false) {
-  voiceEngineActive = true;
+  setVoiceEngineActive(true);
   pauseRecognitionForSpeech()
   voiceEngine.speak(text, autoClose ? hidePopup : null, autoClose)
 }
 
 function speakCurrentSentence() {
   hintMode = true;
-  voiceEngineActive = true;
+  setVoiceEngineActive(true);
   pauseRecognitionForSpeech()
 
   if (voiceInputActive) {
@@ -811,12 +834,12 @@ function onSpeechFinished() {
   // fully off during the speech, so turn it back on right away - any extra
   // waiting here is exactly the window in which a spoken "got it" is lost.
   if (hintMode) {
-    voiceEngineActive = false
+    setVoiceEngineActive(false)
     resumeRecognitionAfterSpeech(0)
     return
   }
   setTimeout(() => {
-    voiceEngineActive = false;
+    setVoiceEngineActive(false);
     ignoreRecognitionUntil = Date.now() + 250
     // hidePopup() (above) already resumes recognition when it runs; when
     // hintMode is true it doesn't run, so resume it here instead.

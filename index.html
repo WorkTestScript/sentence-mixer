@@ -11,6 +11,36 @@
     <link rel="stylesheet" href="css/trainer.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <title>Sentence Mixer</title>
+    <style>
+        /* Indicator in the hint popup: visible while the voice engine is
+           speaking / the microphone is not yet listening again. */
+        .voice-status {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 3px;
+            height: 18px;
+            margin-bottom: 8px;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            pointer-events: none;
+        }
+        .voice-status.active { opacity: 1; }
+        .voice-status span {
+            width: 4px;
+            height: 6px;
+            border-radius: 2px;
+            background: #f97316;
+        }
+        .voice-status.active span { animation: voice-status-bar 0.9s ease-in-out infinite; }
+        .voice-status span:nth-child(2) { animation-delay: 0.15s; }
+        .voice-status span:nth-child(3) { animation-delay: 0.3s; }
+        .voice-status span:nth-child(4) { animation-delay: 0.45s; }
+        @keyframes voice-status-bar {
+            0%, 100% { height: 5px; }
+            50% { height: 18px; }
+        }
+    </style>
 </head>
 
 <body class="trainer-page">
@@ -88,9 +118,9 @@
                 <h3>🎙️ Голосові команди</h3>
                 <ul>
                     <li><span>come up</span>Показати підказку</li>
-                    <li><span>got it</span>Закрити підказку</li>
+                    <li><span>hide it</span>Приховати підказку</li>
                     <li><span>next point</span>Пропустити речення</li>
-                    <li><span>keep it</span>Зберегти речення і закрити підказку</li>
+                    <li><span>keep it</span>Зберегти речення</li>
                     <li><span>say it</span>Проголосити речення</li>
                 </ul>
             </div>
@@ -101,6 +131,7 @@
         <div class="popup-content">
             <button id="close-popup">×</button>
             <div class="popup-text-container">
+                <div id="voice-status" class="voice-status" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
                 <span id="popup-text"></span>
                 <div id="example-text" class="example-text"></div>
             </div>
