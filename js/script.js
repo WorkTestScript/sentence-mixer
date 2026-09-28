@@ -37,19 +37,20 @@ let permissionGranted = false // Track if permission was granted
 let isListening = false // Track if we're currently listening
 let lastTranscript = "" // Store the last recognized transcript
 let voiceEngineActive = false;
-// True once the microphone is actually listening again after being paused
-// for speech. Together with voiceEngineActive it drives the "busy"
-// indicator in the hint popup (see refreshSpeechIndicator).
+// True while the microphone is actually listening (false while it is paused
+// for speech, restarting, or off). Together with voiceEngineActive it drives
+// the red recording dot in the hint popup (see refreshSpeechIndicator).
 let micReady = false
 
 const speechIndicator = document.getElementById("voice-status")
 
-// Shows the indicator while the app is speaking or, if the mic is on, until
-// the mic is listening again - i.e. while a spoken command would be lost.
+// The red dot is shown only when a spoken command can be heard right now:
+// the mic is on and listening, and the app is not speaking. The dot lives
+// inside the popup, so it is only ever visible while the popup is open.
 function refreshSpeechIndicator() {
   if (!speechIndicator) return
-  const busy = voiceEngineActive || (isRecording && !micReady)
-  speechIndicator.classList.toggle("active", busy)
+  const listening = isRecording && micReady && !voiceEngineActive
+  speechIndicator.classList.toggle("active", listening)
 }
 
 function setVoiceEngineActive(value) {
@@ -245,6 +246,8 @@ function initSpeechRecognition() {
   }
 
   recognition.onend = function () {
+    micReady = false
+    refreshSpeechIndicator()
     // Only stop if permission was revoked or there's an error
     // Otherwise, restart to keep listening - unless we deliberately
     // paused it ourselves to let the app speak without the mic hearing it
@@ -321,6 +324,8 @@ function stopVoiceRecording() {
 
   isRecording = false
   voiceInputActive = false // Reset voice input active flag
+  micReady = false
+  refreshSpeechIndicator()
   permissionGranted = false
   if (voiceInputBtn) {
     voiceInputBtn.classList.remove('recording')
