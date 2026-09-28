@@ -73,7 +73,7 @@ function runVoiceCommand(text) {
     showHint()
     return true
   }
-  if (text.includes('hide it')) {
+  if (text.includes('got it')) {
     if (popup.style.display === 'flex') {
       hidePopup()
       return true
@@ -164,7 +164,7 @@ function initSpeechRecognition() {
       // While the hint popup is open, don't treat further speech as an
       // answer attempt. checkAnswer() resets hintMode as a side effect
       // even when the answer is wrong, and closing the hint afterwards
-      // (via "hide it", F8, the close button, etc.) would then
+      // (via "got it", F8, the close button, etc.) would then
       // incorrectly jump to the next sentence, even though nothing
       // correct was ever said. Voice commands above still work as
       // normal since they're checked first and return early.
@@ -285,7 +285,7 @@ function pauseRecognitionForSpeech() {
 // Restart the recognition engine after the app has finished speaking.
 // Waits a short moment first so any trailing audio/echo from the speech
 // has already died out before the mic starts listening again.
-function resumeRecognitionAfterSpeech() {
+function resumeRecognitionAfterSpeech(delay = 250) {
   if (!recognition || !isRecording) return
   setTimeout(() => {
     suppressAutoRestart = false
@@ -296,7 +296,7 @@ function resumeRecognitionAfterSpeech() {
         // Already running is fine - nothing to do
       }
     }
-  }, 250)
+  }, delay)
 }
 
 // Stop voice recording
@@ -563,15 +563,11 @@ function showPopup(text, autoClose = false) {
   }
 
   popup.style.display = "flex"
-  if ((!voiceInputActive && !isRecording) || !hintMode) {
-    speak(text.en, autoClose)
-  }
-  else if (autoClose) {
-    console.log("Auto-closing popup in 2 seconds")  
-    setTimeout(() => {
-      hidePopup()
-    }, 2000);
-  }
+  // Always speak the sentence, including hints shown while the microphone
+  // is on. speak() pauses the recognizer for the duration of the speech
+  // (pauseRecognitionForSpeech), so the mic can't hear the app's own voice,
+  // and onSpeechFinished() turns it back on when the speech ends.
+  speak(text.en, autoClose)
 }
 
 function hidePopup() {
@@ -817,6 +813,15 @@ function showRecognizedTextIndicator() {
 // Method that gets called when voice engine finishes speaking
 function onSpeechFinished() {
   if (!hintMode) hidePopup()
+  // A hint (or "say it") has just been read aloud and the popup stays open,
+  // waiting for the user's next command ("got it", etc.). The microphone was
+  // fully off during the speech, so turn it back on right away - any extra
+  // waiting here is exactly the window in which a spoken "got it" is lost.
+  if (hintMode) {
+    voiceEngineActive = false
+    resumeRecognitionAfterSpeech(0)
+    return
+  }
   setTimeout(() => {
     voiceEngineActive = false;
     ignoreRecognitionUntil = Date.now() + 250
