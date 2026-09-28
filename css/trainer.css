@@ -471,7 +471,7 @@
   font-size: 24px;
   font-weight: 600;
   background: var(--card-bg);
-  border: 1px solid var(--border);
+  border: 3px solid var(--border);
   color: var(--text);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);

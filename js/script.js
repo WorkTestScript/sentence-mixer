@@ -58,6 +58,45 @@ let inputPasteHandler = null;
 let inputCutHandler = null;
 let inputDropHandler = null;
 
+// Indexes of recognition results whose voice command has already been
+// executed (from an interim result), so the same utterance is not run again
+// when it becomes final, nor treated as an answer attempt.
+const handledCommandResults = new Set()
+
+// Runs a voice command if the text contains one. Returns true if handled.
+function runVoiceCommand(text) {
+  if (text.includes('next point')) {
+    skipSentence()
+    return true
+  }
+  if (text.includes('come up')) {
+    showHint()
+    return true
+  }
+  if (text.includes('hide it')) {
+    if (popup.style.display === 'flex') {
+      hidePopup()
+      return true
+    }
+    return false
+  }
+  if (text.includes('keep it')) {
+    saveSentenceToLocalStorageNoAdvance()
+    // Close the hint popup if it is open (hintMode is true here, so
+    // hidePopup() will not advance to the next sentence).
+    if (popup.style.display === 'flex') {
+      hintMode = true
+      hidePopup()
+    }
+    return true
+  }
+  if (text.includes('say it')) {
+    speakCurrentSentence()
+    return true
+  }
+  return false
+}
+
 // Initialize Speech Recognition (called once on page load)
 function initSpeechRecognition() {
   if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -76,6 +115,7 @@ function initSpeechRecognition() {
   recognition.lang = 'en-US' // English language
 
   recognition.onstart = function () {
+    handledCommandResults.clear()
     isRecording = true
     voiceInputActive = true
     permissionGranted = true
@@ -96,7 +136,19 @@ function initSpeechRecognition() {
     let finalTranscript = ''
     hintMode = true
 
+    // Run voice commands immediately on interim results, without waiting
+    // for the recognizer to finalize the phrase (this was the main delay).
     for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (handledCommandResults.has(i)) continue
+      const cmdText = event.results[i][0].transcript.toLowerCase().trim()
+      if (runVoiceCommand(cmdText)) {
+        handledCommandResults.add(i)
+        return
+      }
+    }
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (handledCommandResults.has(i)) continue
       const transcript = event.results[i][0].transcript.trim()
       if (event.results[i].isFinal) {
         finalTranscript += transcript
@@ -108,66 +160,6 @@ function initSpeechRecognition() {
     if (finalTranscript) {
       // Store the transcript
       lastTranscript = finalTranscript
-
-      // Check for voice commands first
-      const normalizedTranscript = finalTranscript.toLowerCase().trim()
-
-      // Check for "next point" command
-      if (normalizedTranscript.includes('next point') ||
-        normalizedTranscript.includes('next point.') ||
-        normalizedTranscript.includes('next point!') ||
-        normalizedTranscript.includes('next point?')) {
-
-        // Trigger skip logic
-        skipSentence()
-        return // Exit early, don't process as regular answer
-      }
-
-      // Check for "come up" command
-      if (normalizedTranscript.includes('come up') ||
-        normalizedTranscript.includes('come up.') ||
-        normalizedTranscript.includes('come up!') ||
-        normalizedTranscript.includes('come up?')) {
-
-        // Trigger hint logic
-        showHint()
-        return // Exit early, don't process as regular answer
-      }
-
-      // Check for "hide it" command
-      if (normalizedTranscript.includes('hide it') ||
-        normalizedTranscript.includes('hide it.') ||
-        normalizedTranscript.includes('hide it!') ||
-        normalizedTranscript.includes('hide it?')) {
-
-        // Close hint popup if it's open
-        if (popup.style.display === 'flex') {
-          hidePopup()
-          return // Exit early, don't process as regular answer
-        }
-      }
-
-      // Check for "keep it" command
-      if (normalizedTranscript.includes('keep it') ||
-        normalizedTranscript.includes('keep it.') ||
-        normalizedTranscript.includes('keep it!') ||
-        normalizedTranscript.includes('keep it?')) {
-
-        // Trigger save sentence logic (same as trainer repeat button)
-        saveSentenceToLocalStorageNoAdvance()
-        return // Exit early, don't process as regular answer
-      }
-      
-      // Check for "say it" command
-      if (normalizedTranscript.includes('say it') ||
-        normalizedTranscript.includes('say it.') ||
-        normalizedTranscript.includes('say it!') ||
-        normalizedTranscript.includes('say it?')) {
-
-        // Trigger speak current sentence logic (same as trainer voice button)
-        speakCurrentSentence()
-        return // Exit early, don't process as regular answer
-      }
 
       // While the hint popup is open, don't treat further speech as an
       // answer attempt. checkAnswer() resets hintMode as a side effect
@@ -304,7 +296,7 @@ function resumeRecognitionAfterSpeech() {
         // Already running is fine - nothing to do
       }
     }
-  }, 700)
+  }, 250)
 }
 
 // Stop voice recording
@@ -588,7 +580,7 @@ function hidePopup() {
   // Give the microphone a brief moment before trusting new results again,
   // so leftover audio from the answer we just spoke doesn't get written
   // into the (already cleared) field for the next sentence.
-  ignoreRecognitionUntil = Date.now() + 700
+  ignoreRecognitionUntil = Date.now() + 250
   resumeRecognitionAfterSpeech()
   popup.style.display = "none"
   userInput.focus()
@@ -827,7 +819,7 @@ function onSpeechFinished() {
   if (!hintMode) hidePopup()
   setTimeout(() => {
     voiceEngineActive = false;
-    ignoreRecognitionUntil = Date.now() + 700
+    ignoreRecognitionUntil = Date.now() + 250
     // hidePopup() (above) already resumes recognition when it runs; when
     // hintMode is true it doesn't run, so resume it here instead.
     if (hintMode) {
@@ -835,5 +827,5 @@ function onSpeechFinished() {
     }
     // userInput.value = '';
     // inputOverlay.innerHTML = '';
-  }, 1000);
+  }, 250);
 }

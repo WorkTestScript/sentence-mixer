@@ -251,7 +251,7 @@ label {
 
 .modal-content {
   background: var(--card-bg);
-  border: 1px solid var(--border);
+  border: 3px solid var(--border);
   padding: 28px;
   border-radius: var(--radius-lg);
   max-width: 440px;
