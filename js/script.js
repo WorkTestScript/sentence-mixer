@@ -73,18 +73,6 @@ let ignoreRecognitionUntil = 0
 let suppressAutoRestart = false
 let consecutiveNetworkErrors = 0
 let recognitionRestartTimer = null
-// Display-only transcript buffer. Answer checking and command recognition
-// continue to use the recognizer's current result exactly as before.
-let voiceDisplayFinals = []
-let voiceDisplayInterim = ''
-let voiceDisplaySeenFinals = new Set()
-
-function renderVoiceDisplay() {
-  const displayText = [...voiceDisplayFinals, voiceDisplayInterim].filter(Boolean).join(' ').trim()
-  if (!displayText) return
-  userInput.value = displayText
-  highlightErrors()
-}
 
 // Input field event management
 let inputKeydownHandler = null;
@@ -172,17 +160,6 @@ function initSpeechRecognition() {
     }
   }
 
-  // A new utterance starts a fresh visible phrase. Keep this separate from
-  // recognition result indexes, which can repeat when the browser restarts
-  // its recognition session.
-  recognition.onspeechstart = function () {
-    voiceDisplayFinals = []
-    voiceDisplayInterim = ''
-    voiceDisplaySeenFinals.clear()
-    userInput.value = ''
-    inputOverlay.innerHTML = ''
-  }
-
   recognition.onresult = function (event) {
     if (voiceEngineActive) return
     if (Date.now() < ignoreRecognitionUntil) return
@@ -192,7 +169,6 @@ function initSpeechRecognition() {
     inputOverlay.innerHTML = ""
     let interimTranscript = ''
     let finalTranscript = ''
-    let newDisplayFinals = []
     hintMode = true
 
     // SpeechRecognition results are cumulative. Rebuild from the complete
@@ -209,11 +185,6 @@ function initSpeechRecognition() {
           handledCommandResults.add(i)
           if (runVoiceCommand(transcript)) continue
           finalTranscript += `${transcript} `
-          const displayKey = `${i}:${transcript.toLowerCase()}`
-          if (!voiceDisplaySeenFinals.has(displayKey)) {
-            voiceDisplaySeenFinals.add(displayKey)
-            newDisplayFinals.push(transcript)
-          }
         }
       } else {
         interimTranscript = transcript
@@ -238,10 +209,6 @@ function initSpeechRecognition() {
       }
     }
     finalTranscript = finalTranscript.trim()
-    if (newDisplayFinals.length) {
-      voiceDisplayFinals.push(...newDisplayFinals)
-    }
-    voiceDisplayInterim = interimTranscript
 
     if (finalTranscript) {
       // Store the transcript
@@ -263,9 +230,6 @@ function initSpeechRecognition() {
 
       userInput.value = finalTranscript
       checkAnswer()
-      // Keep the accumulated visual transcript after an incorrect attempt;
-      // a correct answer opens the popup, which owns and clears the field.
-      if (popup.style.display !== 'flex') renderVoiceDisplay()
       // Let the popup system handle moving to next sentence
       // Don't call getRandomSentence() here - let hidePopup() handle it
     } else if (interimTranscript) {
@@ -281,7 +245,7 @@ function initSpeechRecognition() {
       }
 
       // Show interim results visually
-      renderVoiceDisplay()
+      userInput.value = interimTranscript.trim()
       // The overlay (not the native input) is what actually renders visible
       // characters here - it was previously only refreshed on a *final*
       // result, so a word being spoken looked invisible (only the caret
@@ -450,9 +414,6 @@ function toggleVoiceRecording() {
     }
   } else {
     consecutiveNetworkErrors = 0
-    voiceDisplayFinals = []
-    voiceDisplayInterim = ''
-    voiceDisplaySeenFinals.clear()
     // Clear input for new voice input
     userInput.value = ""
     inputOverlay.innerHTML = ""
@@ -636,9 +597,6 @@ function randomizer(num) {
 
 function getRandomSentence() {
   if (!sentences.length) return
-  voiceDisplayFinals = []
-  voiceDisplayInterim = ''
-  voiceDisplaySeenFinals.clear()
   const count = sentences.length - usedIndexes.length
   sentenceCount.innerText = count
   let availableIndexes = sentences.map((_, index) => index).filter((index) => !usedIndexes.includes(index))
