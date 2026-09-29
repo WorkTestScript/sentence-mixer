@@ -250,8 +250,9 @@ function initSpeechRecognition() {
       // characters here - it was previously only refreshed on a *final*
       // result, so a word being spoken looked invisible (only the caret
       // moved) until recognition finalized it. Refresh it on every interim
-      // update too.
-      highlightErrors()
+      // update too - but in plain mode (no red underline): errors are only
+      // marked once the phrase is final (checkAnswer -> highlightErrors()).
+      highlightErrors(true)
     }
   }
 
@@ -503,8 +504,11 @@ function escapeHtml(text) {
   return text.replace(/[&<>"' ]/g, m => map[m])
 }
 
-// Function to highlight typing errors
-function highlightErrors() {
+// Function to highlight typing errors.
+// When `plain` is true the text is rendered in the overlay WITHOUT any error
+// marking. This is used for interim (still being recognised) voice results,
+// so correctly spoken words are not flashed red while the phrase is unfinished.
+function highlightErrors(plain = false) {
   if (currentSentenceIndex === null) return
 
   const correctAnswer = sentences[currentSentenceIndex].en
@@ -517,7 +521,7 @@ function highlightErrors() {
     const correctChar = correctAnswer[i]
     const escapedChar = escapeHtml(userChar)
 
-    if (userChar !== correctChar) {
+    if (!plain && userChar !== correctChar) {
       // Character is incorrect - wrap it in error span.
       // The background/color are also set inline (not only via the
       // .error-char class in style.css) because some older Chromium
