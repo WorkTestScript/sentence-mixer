@@ -78,29 +78,28 @@ let inputPasteHandler = null;
 let inputCutHandler = null;
 let inputDropHandler = null;
 
-// Indexes of recognition results whose voice command has already been
-// executed (from an interim result), so the same utterance is not run again
-// when it becomes final, nor treated as an answer attempt.
+// Result indexes already handled during the current recognition session.
 const handledCommandResults = new Set()
 
 // Runs a voice command if the text contains one. Returns true if handled.
 function runVoiceCommand(text) {
-  if (text.includes('next point')) {
+  const commandText = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  if (/\b(next point|skip (?:this )?sentence)\b/.test(commandText)) {
     skipSentence()
     return true
   }
-  if (text.includes('come up')) {
+  if (/\b(come up|show (?:the )?hint)\b/.test(commandText)) {
     showHint()
     return true
   }
-  if (text.includes('got it')) {
+  if (/\b(got it|hide it|close (?:the )?hint)\b/.test(commandText)) {
     if (popup.style.display === 'flex') {
       hidePopup()
       return true
     }
     return false
   }
-  if (text.includes('keep it')) {
+  if (/\b(keep it|save (?:this )?sentence)\b/.test(commandText)) {
     saveSentenceToLocalStorageNoAdvance()
     // Close the hint popup if it is open (hintMode is true here, so
     // hidePopup() will not advance to the next sentence).
@@ -110,7 +109,7 @@ function runVoiceCommand(text) {
     }
     return true
   }
-  if (text.includes('say it')) {
+  if (/\b(say it|read (?:the )?sentence)\b/.test(commandText)) {
     speakCurrentSentence()
     return true
   }
@@ -158,26 +157,21 @@ function initSpeechRecognition() {
     let finalTranscript = ''
     hintMode = true
 
-    // Run voice commands immediately on interim results, without waiting
-    // for the recognizer to finalize the phrase (this was the main delay).
+    // SpeechRecognition results are cumulative. Rebuild from the complete
+    // result list rather than treating each event as a fresh transcript.
     for (let i = event.resultIndex; i < event.results.length; i++) {
-      if (handledCommandResults.has(i)) continue
-      const cmdText = event.results[i][0].transcript.toLowerCase().trim()
-      if (runVoiceCommand(cmdText)) {
-        handledCommandResults.add(i)
-        return
-      }
-    }
-
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      if (handledCommandResults.has(i)) continue
       const transcript = event.results[i][0].transcript.trim()
       if (event.results[i].isFinal) {
-        finalTranscript += transcript
+        if (!handledCommandResults.has(i)) {
+          handledCommandResults.add(i)
+          if (runVoiceCommand(transcript)) continue
+          finalTranscript += `${transcript} `
+        }
       } else {
-        interimTranscript += transcript
+        interimTranscript = transcript
       }
     }
+    finalTranscript = finalTranscript.trim()
 
     if (finalTranscript) {
       // Store the transcript
