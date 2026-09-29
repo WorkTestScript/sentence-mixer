@@ -77,6 +77,7 @@ let recognitionRestartTimer = null
 // continue to use the recognizer's current result exactly as before.
 let voiceDisplayFinals = []
 let voiceDisplayInterim = ''
+let voiceDisplayResetOnNextResult = false
 
 function renderVoiceDisplay() {
   const displayText = [...voiceDisplayFinals, voiceDisplayInterim].filter(Boolean).join(' ').trim()
@@ -176,6 +177,16 @@ function initSpeechRecognition() {
     if (Date.now() < ignoreRecognitionUntil) return
     consecutiveNetworkErrors = 0
 
+    // Keep the last completed phrase visible for its recognition flash, then
+    // start a clean display when the next utterance arrives.
+    if (voiceDisplayResetOnNextResult) {
+      voiceDisplayFinals = []
+      voiceDisplayInterim = ''
+      voiceDisplayResetOnNextResult = false
+      userInput.value = ''
+      inputOverlay.innerHTML = ''
+    }
+
     userInput.value = ""
     inputOverlay.innerHTML = ""
     let interimTranscript = ''
@@ -250,6 +261,7 @@ function initSpeechRecognition() {
       // Keep the accumulated visual transcript after an incorrect attempt;
       // a correct answer opens the popup, which owns and clears the field.
       if (popup.style.display !== 'flex') renderVoiceDisplay()
+      voiceDisplayResetOnNextResult = true
       // Let the popup system handle moving to next sentence
       // Don't call getRandomSentence() here - let hidePopup() handle it
     } else if (interimTranscript) {
@@ -436,6 +448,7 @@ function toggleVoiceRecording() {
     consecutiveNetworkErrors = 0
     voiceDisplayFinals = []
     voiceDisplayInterim = ''
+    voiceDisplayResetOnNextResult = false
     // Clear input for new voice input
     userInput.value = ""
     inputOverlay.innerHTML = ""
@@ -619,6 +632,9 @@ function randomizer(num) {
 
 function getRandomSentence() {
   if (!sentences.length) return
+  voiceDisplayFinals = []
+  voiceDisplayInterim = ''
+  voiceDisplayResetOnNextResult = false
   const count = sentences.length - usedIndexes.length
   sentenceCount.innerText = count
   let availableIndexes = sentences.map((_, index) => index).filter((index) => !usedIndexes.includes(index))
