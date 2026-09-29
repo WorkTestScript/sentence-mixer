@@ -82,6 +82,14 @@ let inputDropHandler = null;
 
 // Result indexes already handled during the current recognition session.
 const handledCommandResults = new Set()
+let pendingVoiceCommand = null
+let pendingVoiceCommandTimer = null
+const VOICE_COMMAND_STABILITY_MS = 220
+
+function isVoiceCommandText(text) {
+  const commandText = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  return /\b(next point|skip (?:this )?sentence|come up|show (?:the )?hint|got it|hide it|close (?:the )?hint|keep it|save (?:this )?sentence|say it|read (?:the )?sentence)\b/.test(commandText)
+}
 
 // Runs a voice command if the text contains one. Returns true if handled.
 function runVoiceCommand(text) {
@@ -137,6 +145,9 @@ function initSpeechRecognition() {
 
   recognition.onstart = function () {
     handledCommandResults.clear()
+    if (pendingVoiceCommandTimer) clearTimeout(pendingVoiceCommandTimer)
+    pendingVoiceCommandTimer = null
+    pendingVoiceCommand = null
     micReady = true
     isRecording = true
     voiceInputActive = true
@@ -165,6 +176,11 @@ function initSpeechRecognition() {
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const transcript = event.results[i][0].transcript.trim()
       if (event.results[i].isFinal) {
+        if (pendingVoiceCommand?.index === i) {
+          clearTimeout(pendingVoiceCommandTimer)
+          pendingVoiceCommandTimer = null
+          pendingVoiceCommand = null
+        }
         if (!handledCommandResults.has(i)) {
           handledCommandResults.add(i)
           if (runVoiceCommand(transcript)) continue
@@ -172,6 +188,24 @@ function initSpeechRecognition() {
         }
       } else {
         interimTranscript = transcript
+        if (!handledCommandResults.has(i) && isVoiceCommandText(transcript)) {
+          const samePending = pendingVoiceCommand?.index === i && pendingVoiceCommand.text === transcript
+          if (!samePending) {
+            if (pendingVoiceCommandTimer) clearTimeout(pendingVoiceCommandTimer)
+            pendingVoiceCommand = { index: i, text: transcript }
+            pendingVoiceCommandTimer = setTimeout(() => {
+              const command = pendingVoiceCommand
+              pendingVoiceCommand = null
+              pendingVoiceCommandTimer = null
+              if (!command || !isRecording || voiceEngineActive || handledCommandResults.has(command.index)) return
+              if (runVoiceCommand(command.text)) handledCommandResults.add(command.index)
+            }, VOICE_COMMAND_STABILITY_MS)
+          }
+        } else if (pendingVoiceCommand?.index === i) {
+          clearTimeout(pendingVoiceCommandTimer)
+          pendingVoiceCommandTimer = null
+          pendingVoiceCommand = null
+        }
       }
     }
     finalTranscript = finalTranscript.trim()
