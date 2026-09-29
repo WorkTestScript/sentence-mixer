@@ -257,10 +257,16 @@ function initSpeechRecognition() {
   }
 
   recognition.onerror = function (event) {
-    if (event.error !== 'no-speech') console.error('Speech recognition error:', event.error)
+    // 'network' errors are logged separately below with extra details.
+    if (event.error !== 'no-speech' && event.error !== 'network') console.error('Speech recognition error:', event.error)
 
     if (event.error === 'network') {
       consecutiveNetworkErrors += 1
+      // Log only (no change in handling) so voice input reliability can be evaluated.
+      console.warn(
+        `[Voice input] Network error #${consecutiveNetworkErrors} at ${new Date().toLocaleTimeString()}`,
+        { error: event.error, message: event.message || '', online: navigator.onLine }
+      )
       return
     }
 
@@ -291,6 +297,7 @@ function initSpeechRecognition() {
     if (permissionGranted && isRecording && !suppressAutoRestart) {
       if (recognitionRestartTimer) clearTimeout(recognitionRestartTimer)
       if (consecutiveNetworkErrors >= 3) {
+        console.error(`[Voice input] ${consecutiveNetworkErrors} consecutive network errors - voice recognition stopped at ${new Date().toLocaleTimeString()}`)
         stopVoiceRecording()
         // Close a hint without advancing the exercise. This leaves the app
         // usable when the browser's speech service cannot be reached.
@@ -305,6 +312,9 @@ function initSpeechRecognition() {
       const retryDelay = consecutiveNetworkErrors
         ? Math.min(1000 * (2 ** (consecutiveNetworkErrors - 1)), 4000)
         : 300
+      if (consecutiveNetworkErrors) {
+        console.info(`[Voice input] Restarting recognition after network error in ${retryDelay} ms`)
+      }
       recognitionRestartTimer = setTimeout(() => {
         recognitionRestartTimer = null
         if (recognition && permissionGranted && isRecording && !suppressAutoRestart) {
