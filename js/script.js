@@ -71,6 +71,8 @@ let ignoreRecognitionUntil = 0
 // stops it from being able to pick up its own voice as an "answer" at
 // all, rather than trying to filter that out after the fact.
 let suppressAutoRestart = false
+let consecutiveNetworkErrors = 0
+let recognitionRestartTimer = null
 
 // Input field event management
 let inputKeydownHandler = null;
@@ -150,6 +152,7 @@ function initSpeechRecognition() {
   recognition.onresult = function (event) {
     if (voiceEngineActive) return
     if (Date.now() < ignoreRecognitionUntil) return
+    consecutiveNetworkErrors = 0
 
     userInput.value = ""
     inputOverlay.innerHTML = ""
@@ -221,6 +224,11 @@ function initSpeechRecognition() {
   recognition.onerror = function (event) {
     if (event.error !== 'no-speech') console.error('Speech recognition error:', event.error)
 
+    if (event.error === 'network') {
+      consecutiveNetworkErrors += 1
+      return
+    }
+
     // Handle permission denied specifically
     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
       permissionGranted = false
@@ -246,7 +254,24 @@ function initSpeechRecognition() {
     // Otherwise, restart to keep listening - unless we deliberately
     // paused it ourselves to let the app speak without the mic hearing it
     if (permissionGranted && isRecording && !suppressAutoRestart) {
-      setTimeout(() => {
+      if (recognitionRestartTimer) clearTimeout(recognitionRestartTimer)
+      if (consecutiveNetworkErrors >= 3) {
+        stopVoiceRecording()
+        // Close a hint without advancing the exercise. This leaves the app
+        // usable when the browser's speech service cannot be reached.
+        if (popup.style.display === 'flex') {
+          hintMode = true
+          hidePopup()
+        }
+        showInformationModal('Не вдалося відновити голосове розпізнавання через мережеву помилку. Підказку закрито, поточне речення збережено. Перевірте з’єднання та спробуйте ввімкнути мікрофон знову.')
+        consecutiveNetworkErrors = 0
+        return
+      }
+      const retryDelay = consecutiveNetworkErrors
+        ? Math.min(1000 * (2 ** (consecutiveNetworkErrors - 1)), 4000)
+        : 300
+      recognitionRestartTimer = setTimeout(() => {
+        recognitionRestartTimer = null
         if (recognition && permissionGranted && isRecording && !suppressAutoRestart) {
           try {
             recognition.start()
@@ -255,7 +280,7 @@ function initSpeechRecognition() {
             if (e.name !== 'InvalidStateError') console.log('Recognition restart failed:', e)
           }
         }
-      }, 100)
+      }, retryDelay)
     } else if (!suppressAutoRestart) {
       isListening = false
       stopVoiceRecording()
@@ -316,6 +341,10 @@ function resumeRecognitionAfterSpeech(delay = 500) {
 function stopVoiceRecording() {
   if (!recognition) return
 
+  if (recognitionRestartTimer) {
+    clearTimeout(recognitionRestartTimer)
+    recognitionRestartTimer = null
+  }
   isRecording = false
   voiceInputActive = false // Reset voice input active flag
   micReady = false
@@ -350,6 +379,7 @@ function toggleVoiceRecording() {
       console.error('Error stopping speech recognition:', error)
     }
   } else {
+    consecutiveNetworkErrors = 0
     // Clear input for new voice input
     userInput.value = ""
     inputOverlay.innerHTML = ""
