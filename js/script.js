@@ -148,6 +148,7 @@ function initSpeechRecognition() {
     if (pendingVoiceCommandTimer) clearTimeout(pendingVoiceCommandTimer)
     pendingVoiceCommandTimer = null
     pendingVoiceCommand = null
+    rebaseSpokenLine()
     micReady = true
     isRecording = true
     voiceInputActive = true
@@ -209,6 +210,7 @@ function initSpeechRecognition() {
       }
     }
     finalTranscript = finalTranscript.trim()
+    updateSpokenLine(event)
 
     if (finalTranscript) {
       // Store the transcript
@@ -634,6 +636,7 @@ function getRandomSentence() {
   hintMode = false
   randomNumber = null
   updateFavoriteIndicator()
+  resetSpokenLine()
 }
 
 function showPopup(text, autoClose = false) {
@@ -920,6 +923,121 @@ window.addEventListener("saveSelectedChanged", () => updateFavoriteIndicator())
 window.addEventListener("storage", (e) => {
   if (e.key === "saveSelected" || e.key === null) updateFavoriteIndicator()
 })
+
+/* ---------- Spoken line under the input (microphone mode) ----------
+   Builds one line from ALL recognition results of the current attempt, so
+   "hello", then "world", then "I want" give "hello world I want" and the earlier
+   words never disappear (the input field itself only shows the newest piece).
+   Display only: the input field and answer checking are not touched.
+   A new attempt starts (line cleared) when
+     - a new sentence is loaded (correct answer, skip),
+     - the user starts speaking after the previous attempt was finalised
+       (i.e. it has been checked and was wrong), or
+     - the microphone is switched off.
+   Words spoken before a hint / a microphone restart are kept in the line. */
+const spokenLine = document.getElementById("spoken-line")
+let spokenPrefix = ""     // text kept from before a microphone restart / hint
+let spokenBase = 0        // first recognition result that belongs to this attempt
+let spokenResultsLen = 0  // number of results seen in the current recognition session
+let spokenCurrent = ""    // text currently shown
+let spokenChecked = false // every result of the attempt is final (answer was checked)
+
+function renderSpokenLine(parts) {
+  if (!spokenLine) return
+  spokenLine.textContent = ""
+  parts.forEach((part, index) => {
+    const span = document.createElement("span")
+    if (part.pending) span.className = "spoken-interim"
+    span.textContent = (index ? " " : "") + part.text
+    spokenLine.appendChild(span)
+  })
+}
+
+// Called when a recognition session (re)starts: its results are numbered from 0 again
+function rebaseSpokenLine() {
+  spokenPrefix = spokenCurrent
+  spokenBase = 0
+  spokenResultsLen = 0
+}
+
+function resetSpokenLine() {
+  spokenPrefix = ""
+  spokenCurrent = ""
+  spokenBase = spokenResultsLen
+  spokenChecked = false
+  renderSpokenLine([])
+}
+
+// Command phrases (same as in runVoiceCommand). A result that is only the beginning
+// of one of them ("come" before "up") is kept out of the line until it is clear
+// whether it is a command or part of the sentence.
+const VOICE_COMMAND_PHRASES = [
+  "next point", "skip sentence", "skip this sentence", "come up", "show hint", "show the hint",
+  "got it", "hide it", "close hint", "close the hint", "keep it", "save sentence",
+  "save this sentence", "say it", "read sentence", "read the sentence",
+]
+
+function isPartialVoiceCommand(text) {
+  const normalized = text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+  if (!normalized) return false
+  return VOICE_COMMAND_PHRASES.some((phrase) => phrase.startsWith(normalized + " "))
+}
+
+function updateSpokenLine(event) {
+  if (!spokenLine) return
+  const results = event.results
+  const previousLength = spokenResultsLen
+  spokenResultsLen = results.length
+
+  // While the hint popup is open speech is not an answer attempt: keep the line, skip those results
+  if (popup.style.display === "flex") {
+    spokenPrefix = spokenCurrent
+    spokenBase = results.length
+    return
+  }
+
+  // Results that belong to the sentence. Spoken commands ("next point", ...) never do,
+  // and neither does a still-unfinished beginning of a command.
+  let items = []
+  let anyPending = false
+  for (let i = spokenBase; i < results.length; i++) {
+    const text = results[i][0].transcript.trim()
+    const pending = !results[i].isFinal
+    if (!text || isVoiceCommandText(text)) continue
+    if (pending && isPartialVoiceCommand(text)) {
+      anyPending = true
+      continue
+    }
+    if (pending) anyPending = true
+    items.push({ index: i, text, pending })
+  }
+
+  // New speech after a finalised (checked) attempt -> start a fresh line
+  if (spokenChecked && items.some((item) => item.index >= previousLength)) {
+    spokenPrefix = ""
+    spokenBase = previousLength
+    spokenChecked = false
+    items = items.filter((item) => item.index >= previousLength)
+  }
+
+  const parts = []
+  if (spokenPrefix) parts.push({ text: spokenPrefix, pending: false })
+  items.forEach((item) => parts.push({ text: item.text, pending: item.pending }))
+
+  if (items.length) spokenChecked = !anyPending
+  spokenCurrent = parts.map((part) => part.text).join(" ")
+  renderSpokenLine(parts)
+}
+
+// Show the line only while the microphone is on; clear it when the mic stops.
+// (Watches the mic button's "recording" class, so no mic code had to change.)
+if (voiceInputBtn && spokenLine) {
+  new MutationObserver(() => {
+    const recording = voiceInputBtn.classList.contains("recording")
+    spokenLine.classList.toggle("active", recording)
+    if (!recording) resetSpokenLine()
+  }).observe(voiceInputBtn, { attributes: true, attributeFilter: ["class"] })
+}
 
 // Voice input button event listener
 if (voiceInputBtn) {
