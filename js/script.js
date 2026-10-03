@@ -211,6 +211,7 @@ function initSpeechRecognition() {
     }
     finalTranscript = finalTranscript.trim()
     updateSpokenLine(event)
+    updateVoiceWave(event)
 
     if (finalTranscript) {
       // Store the transcript
@@ -661,6 +662,7 @@ function showPopup(text, autoClose = false) {
 
   popup.style.display = "flex"
   updateFavoriteIndicator(text)
+  setInputWave(false)
   // Always speak the sentence, including hints shown while the microphone
   // is on. speak() pauses the recognizer for the duration of the speech
   // (pauseRecognitionForSpeech), so the mic can't hear the app's own voice,
@@ -924,6 +926,36 @@ window.addEventListener("storage", (e) => {
   if (e.key === "saveSelected" || e.key === null) updateFavoriteIndicator()
 })
 
+/* ---------- Sound wave inside the input (microphone mode) ----------
+   While a phrase is being spoken (the recognizer only has an unfinished, interim
+   result) the input shows an animated wave instead of the words that keep
+   changing. As soon as the phrase is complete the wave disappears and the text
+   appears. Purely visual: the input's value, the overlay content and the answer
+   check are not touched - the overlay is only hidden by CSS meanwhile. */
+const inputWrapper = userInput ? userInput.parentElement : null
+let inputWaveTimer = null
+
+if (inputWrapper) {
+  const wave = document.createElement("div")
+  wave.className = "input-wave"
+  wave.setAttribute("aria-hidden", "true")
+  for (let i = 0; i < 21; i++) {
+    const bar = document.createElement("span")
+    bar.style.animationDelay = `${-(i * 0.13).toFixed(2)}s`
+    bar.style.animationDuration = `${(0.7 + (i % 5) * 0.14).toFixed(2)}s`
+    wave.appendChild(bar)
+  }
+  inputWrapper.appendChild(wave)
+}
+
+function setInputWave(on) {
+  if (!inputWrapper) return
+  inputWrapper.classList.toggle("is-hearing", on)
+  clearTimeout(inputWaveTimer)
+  // Safety net: if recognition events stop arriving, never leave the wave stuck
+  if (on) inputWaveTimer = setTimeout(() => inputWrapper.classList.remove("is-hearing"), 5000)
+}
+
 /* ---------- Spoken line under the input (microphone mode) ----------
    Builds one line from ALL recognition results of the current attempt, so
    "hello", then "world", then "I want" give "hello world I want" and the earlier
@@ -961,6 +993,8 @@ function rebaseSpokenLine() {
 }
 
 function resetSpokenLine() {
+  setInputWave(false)
+  setVoiceWave(false)
   spokenPrefix = ""
   spokenCurrent = ""
   spokenBase = spokenResultsLen
@@ -988,6 +1022,12 @@ function updateSpokenLine(event) {
   const results = event.results
   const previousLength = spokenResultsLen
   spokenResultsLen = results.length
+
+  // Wave while the newest result is still unfinished (and is not a voice command)
+  const newest = results[results.length - 1]
+  setInputWave(
+    popup.style.display !== "flex" && !!newest && !newest.isFinal && !isVoiceCommandText(newest[0].transcript)
+  )
 
   // While the hint popup is open speech is not an answer attempt: keep the line, skip those results
   if (popup.style.display === "flex") {
@@ -1027,6 +1067,41 @@ function updateSpokenLine(event) {
   if (items.length) spokenChecked = !anyPending
   spokenCurrent = parts.map((part) => part.text).join(" ")
   renderSpokenLine(parts)
+}
+
+/* ---------- Sound-wave animation inside the input (microphone mode) ----------
+   While speech is being recognised (interim results) an animated wave is shown in
+   the input instead of the half-finished words. When the phrase is final the wave
+   disappears and the text appears as usual. Purely visual: the input value, the
+   overlay content and answer checking are untouched (the overlay is only hidden by CSS). */
+const inputWrapperEl = document.querySelector(".input-wrapper")
+const VOICE_WAVE_IDLE_MS = 2500
+let voiceWaveTimer = null
+
+function setVoiceWave(active) {
+  if (!inputWrapperEl) return
+  inputWrapperEl.classList.toggle("voice-active", active)
+  if (voiceWaveTimer) clearTimeout(voiceWaveTimer)
+  voiceWaveTimer = null
+  // Safety net: never leave the wave running if no final result ever arrives
+  if (active) voiceWaveTimer = setTimeout(() => inputWrapperEl.classList.remove("voice-active"), VOICE_WAVE_IDLE_MS)
+}
+
+function updateVoiceWave(event) {
+  if (!inputWrapperEl) return
+  if (popup.style.display === "flex") {
+    setVoiceWave(false)
+    return
+  }
+  let speaking = false
+  for (let i = event.resultIndex; i < event.results.length; i++) {
+    const result = event.results[i]
+    if (result.isFinal) continue
+    const text = result[0].transcript.trim()
+    if (!text || isVoiceCommandText(text) || isPartialVoiceCommand(text)) continue
+    speaking = true
+  }
+  setVoiceWave(speaking)
 }
 
 // Show the line only while the microphone is on; clear it when the mic stops.
