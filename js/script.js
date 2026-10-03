@@ -633,6 +633,7 @@ function getRandomSentence() {
   userInput.focus()
   hintMode = false
   randomNumber = null
+  updateFavoriteIndicator()
 }
 
 function showPopup(text, autoClose = false) {
@@ -656,6 +657,7 @@ function showPopup(text, autoClose = false) {
   }
 
   popup.style.display = "flex"
+  updateFavoriteIndicator(text)
   // Always speak the sentence, including hints shown while the microphone
   // is on. speak() pauses the recognizer for the duration of the speech
   // (pauseRecognitionForSpeech), so the mic can't hear the app's own voice,
@@ -881,6 +883,43 @@ if (trainerRepeatBtn) {
   trainerRepeatBtn.addEventListener("click", saveSentenceToLocalStorageNoAdvance)
 }
 trainerVoiceBtn.addEventListener("click", speakCurrentSentence)
+
+/* ---------- Favorite indicator in the hint popup ----------
+   "+" while the sentence is not in saveSelected, a yellow heart once it is.
+   Re-checked every time the popup opens and whenever saveSelected changes
+   (saving a sentence, saving the list to a file, another tab). */
+const FAVORITE_HEART_SVG =
+  '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>'
+
+function isSentenceFavorite(sentence) {
+  if (!sentence) return false
+  try {
+    const stored = JSON.parse(localStorage.getItem("saveSelected"))
+    return Array.isArray(stored) && stored.some((item) => item.ua === sentence.ua && item.en === sentence.en)
+  } catch (e) {
+    return false
+  }
+}
+
+function renderFavoriteButton(button, favorite) {
+  if (!button) return
+  button.classList.toggle("is-favorite", favorite)
+  button.title = favorite ? "Додано до вибраного" : "Додати до вибраного"
+  if (favorite) button.innerHTML = FAVORITE_HEART_SVG
+  else button.textContent = "+"
+}
+
+// Updates both "+" buttons: the one in the hint popup (for the sentence it shows)
+// and the corner one on the main screen (for the current sentence).
+function updateFavoriteIndicator(sentence = sentences[currentSentenceIndex]) {
+  renderFavoriteButton(saveSentence, isSentenceFavorite(sentence))
+  renderFavoriteButton(trainerRepeatBtn, isSentenceFavorite(sentences[currentSentenceIndex]))
+}
+
+window.addEventListener("saveSelectedChanged", () => updateFavoriteIndicator())
+window.addEventListener("storage", (e) => {
+  if (e.key === "saveSelected" || e.key === null) updateFavoriteIndicator()
+})
 
 // Voice input button event listener
 if (voiceInputBtn) {

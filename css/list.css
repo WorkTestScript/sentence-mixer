@@ -310,3 +310,19 @@
     min-width: 0;
   }
 }
+
+
+/* Favorite heart: outline when not saved, filled yellow when saved */
+.favorite-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.favorite-icon svg {
+  display: block;
+  fill: none;
+}
+
+.favorite-icon.active svg {
+  fill: currentColor;
+}

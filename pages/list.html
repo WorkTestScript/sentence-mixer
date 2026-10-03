@@ -14,7 +14,9 @@
 
 <body>
   <nav id="navbar">
-    <ul></ul>
+    <ul>
+      <li><button class="save-selected-open-modal">Зберегти вибране</button></li>
+    </ul>
   </nav>
 
   <div class="list-page">
@@ -55,9 +57,28 @@
     </div>
   </div>
 
+  <!-- Save selected modal -->
+  <div class="save-modal modal">
+    <div class="modal-content">
+      <h3>Зберегти вибрані речення</h3>
+      <input type="text" id="file-name" placeholder="File name">
+      <div class="modal-control">
+        <button id="save-selected-to-file-btn" data-storage="saveSelected">Зберегти</button>
+        <button class="close-modal-btn">Скасувати</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="information-modal modal">
+    <div class="modal-content">
+      <p id="information-modal-text"></p>
+    </div>
+  </div>
+
   <script src="../js/theme.js"></script>
   <script src="../js/voiceEngine.js"></script>
   <script src="../js/list.js"></script>
+  <script src="../js/modal.js" defer></script>
 </body>
 
 </html>

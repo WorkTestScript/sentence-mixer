@@ -572,3 +572,29 @@
     min-width: 0;
   }
 }
+
+
+/* Hint popup: yellow heart replaces "+" once the sentence is in the favorites */
+#repeat-sentence svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+#repeat-sentence.is-favorite,
+#repeat-sentence.is-favorite:hover {
+  color: var(--warning);
+}
+
+
+/* Corner "+" on the main screen: yellow heart once the current sentence is a favorite */
+#trainer-repeat-btn svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+#trainer-repeat-btn.is-favorite,
+#trainer-repeat-btn.is-favorite:hover {
+  color: var(--warning);
+}

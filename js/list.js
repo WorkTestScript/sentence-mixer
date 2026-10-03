@@ -28,6 +28,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  /* ---------- Favorite (heart) icons ---------- */
+
+  const HEART_ICON =
+    '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>'
+  const favoriteIcons = new Map()
+
+  const isSaved = (saved, sentence) => saved.some((s) => s.ua === sentence.ua && s.en === sentence.en)
+
+  // Lit state always mirrors saveSelected: once added, a heart stays lit
+  function syncFavoriteIcons() {
+    const saved = readSaved()
+    favoriteIcons.forEach((sentence, icon) => {
+      if (!icon.isConnected) {
+        favoriteIcons.delete(icon)
+        return
+      }
+      icon.classList.toggle("active", isSaved(saved, sentence))
+    })
+  }
+
+  function registerFavoriteIcon(icon, sentence) {
+    favoriteIcons.set(icon, sentence)
+    icon.classList.toggle("active", isSaved(readSaved(), sentence))
+  }
+
   /* ---------- Voice engine (dummy controls) ---------- */
 
   function initializeVoiceEngine() {
@@ -84,7 +109,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const favorite = document.createElement("span")
       favorite.className = "favorite-icon"
-      favorite.innerHTML = "★"
+      favorite.innerHTML = HEART_ICON
+      registerFavoriteIcon(favorite, sentence)
       if (saved.some((s) => s.ua === sentence.ua && s.en === sentence.en)) {
         favorite.classList.add("active")
       }
@@ -102,7 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
       favorite.addEventListener("click", (e) => {
         e.stopPropagation()
         saveSentenceToFavorites(sentence)
-        favorite.classList.toggle("active")
+        syncFavoriteIcons()
       })
 
       sentencesList.appendChild(li)
@@ -184,7 +210,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const favorite = document.createElement("span")
         favorite.className = "favorite-icon"
-        favorite.innerHTML = "★"
+        favorite.innerHTML = HEART_ICON
+        registerFavoriteIcon(favorite, result)
 
         actions.appendChild(voiceButton)
         actions.appendChild(favorite)
@@ -199,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
         favorite.addEventListener("click", (e) => {
           e.stopPropagation()
           saveSentenceToFavorites(result)
-          favorite.classList.toggle("active")
+          syncFavoriteIcons()
         })
       })
     }
@@ -253,6 +280,10 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleLanguageBtn.addEventListener("click", toggleLanguage)
   searchInput.addEventListener("input", handleSearch)
   voiceBtn.addEventListener("click", speakTranslation)
+  window.addEventListener("saveSelectedChanged", syncFavoriteIcons)
+  window.addEventListener("storage", (e) => {
+    if (e.key === "saveSelected" || e.key === null) syncFavoriteIcons()
+  })
 
   window.addEventListener("click", (event) => {
     if (event.target === translationModal) closeModal(translationModal)
