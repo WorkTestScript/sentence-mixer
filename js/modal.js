@@ -197,6 +197,16 @@
 
   /* ---------- Save to file ---------- */
 
+  // Default file name suffix: "DD.MM.YYYY time HH.MM" in the user's local time.
+  // ":" is forbidden in file names (Windows etc.), so the time uses ".".
+  function getDefaultFileStamp() {
+    const now = new Date()
+    const pad = (n) => String(n).padStart(2, "0")
+    const date = `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`
+    const time = `${pad(now.getHours())}.${pad(now.getMinutes())}`
+    return `${date} time ${time}`
+  }
+
   function saveToFile(event) {
     const storageKey = event.currentTarget.dataset.storage
     const sentences = readStorage(storageKey)
@@ -204,7 +214,7 @@
     const requestedName = fileNameInput?.value.trim()
     const safeName = requestedName
       ? requestedName.replace(/\.json$/i, "").replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-").replace(/[. ]+$/g, "")
-      : `Sentence list ${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}`
+      : `Sentence list ${getDefaultFileStamp()}`
     const fileName = `${safeName || "Sentence list"}.json`
 
     if (!sentences.length) {
@@ -379,6 +389,80 @@
     closeJsonAddConfirmationModal()
   }
 
+  /* ---------- JSON copy (edit-item choice modal + whole list) ---------- */
+
+  async function copyTextToClipboard(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text)
+        return true
+      }
+    } catch (clipboardError) {
+      /* fall through to legacy copy */
+    }
+
+    const textarea = document.createElement("textarea")
+    textarea.value = text
+    textarea.setAttribute("readonly", "")
+    textarea.style.position = "fixed"
+    textarea.style.opacity = "0"
+    document.body.appendChild(textarea)
+    textarea.select()
+    let success = false
+    try {
+      success = document.execCommand("copy")
+    } catch {
+      success = false
+    }
+    document.body.removeChild(textarea)
+    return success
+  }
+
+  const closeJsonActionModal = () => hideModal($(".json-action-modal"))
+  const showJsonActionModal = () => showModal($(".json-action-modal"))
+
+  // Option 1: paste JSON (existing logic, unchanged)
+  function handleJsonActionPaste() {
+    closeJsonActionModal()
+    handleJsonClipboard()
+  }
+
+  // Option 2: copy the sentence currently open in the edit modal as one array element
+  async function handleJsonActionCopy() {
+    const item = {
+      en: $("#editEn")?.value ?? "",
+      ua: $("#editUa")?.value ?? "",
+      example: $("#editExample")?.value ?? "",
+    }
+    const copied = await copyTextToClipboard(JSON.stringify(item, null, 2))
+    closeJsonActionModal()
+    showInformationModal(copied ? "JSON скопійовано" : "Не вдалося скопіювати")
+  }
+
+  // Save modal: copy the whole created list as a JSON array
+  async function handleCopyListJson() {
+    const storageKey = $("#copy-list-json-btn")?.dataset.storage || STORAGE_KEYS.created
+    const sentences = readStorage(storageKey)
+
+    if (!sentences.length) {
+      closeSaveModal()
+      showInformationModal("Список порожній")
+      return
+    }
+
+    const copied = await copyTextToClipboard(JSON.stringify(normalizeDataFormat(sentences), null, 2))
+    closeSaveModal()
+    showInformationModal(copied ? "Список скопійовано" : "Не вдалося скопіювати")
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    $("#json-action-paste-btn")?.addEventListener("click", handleJsonActionPaste)
+    $("#json-action-copy-btn")?.addEventListener("click", handleJsonActionCopy)
+    $("#copy-list-json-btn")?.addEventListener("click", handleCopyListJson)
+    // Refresh "Зберегти" state each time the save modal opens (list may have changed since page load)
+    $(".save-selected-open-modal")?.addEventListener("click", updateSaveSelectedButtonState)
+  })
+
   /* ---------- Wire up event listeners ---------- */
 
   document.addEventListener("click", (event) => {
@@ -421,7 +505,7 @@
   })
 
   document.addEventListener("DOMContentLoaded", () => {
-    $("#json-clipboard-btn")?.addEventListener("click", handleJsonClipboard)
+    $("#json-clipboard-btn")?.addEventListener("click", showJsonActionModal)
     $("#json-confirm-btn")?.addEventListener("click", confirmJsonReplacement)
     $("#json-cancel-btn")?.addEventListener("click", cancelJsonReplacement)
     $("#json-add-button")?.addEventListener("click", handleJsonAddClipboard)
@@ -445,6 +529,8 @@
   window.showJsonConfirmationModal = showJsonConfirmationModal
   window.showJsonAddConfirmationModal = showJsonAddConfirmationModal
   window.handleJsonClipboard = handleJsonClipboard
+  window.showJsonActionModal = showJsonActionModal
+  window.closeJsonActionModal = closeJsonActionModal
   window.handleJsonAddClipboard = handleJsonAddClipboard
   window.confirmJsonReplacement = confirmJsonReplacement
   window.cancelJsonReplacement = cancelJsonReplacement

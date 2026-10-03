@@ -89,6 +89,30 @@
   outline-offset: 2px;
 }
 
+.voice-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 18px;
+            margin-bottom: 8px;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            pointer-events: none;
+        }
+        .voice-status.active { opacity: 1; }
+        .voice-status span {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+        }
+        .voice-status.active span { animation: voice-status-blink 1s ease-in-out infinite; }
+        @keyframes voice-status-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+
 @media (max-width: 620px) {
   .load-options-grid {
     grid-template-columns: 1fr;

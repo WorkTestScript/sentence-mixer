@@ -130,6 +130,7 @@
             <input type="text" id="file-name" placeholder="File name">
             <div class="modal-control">
                 <button id="save-selected-to-file-btn" type="button" data-storage="createdSentences">Зберегти</button>
+                <button id="copy-list-json-btn" type="button" data-storage="createdSentences">JSON</button>
                 <button class="close-modal-btn">Скасувати</button>
             </div>
         </div>
@@ -157,6 +158,17 @@
             <div class="modal-control">
                 <button id="json-add-confirm-btn">Підтвердити</button>
                 <button id="json-add-cancel-btn">Відхилити</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="json-action-modal modal">
+        <div class="modal-content">
+            <h3>JSON</h3>
+            <div class="modal-control">
+                <button id="json-action-paste-btn" type="button">Вставити JSON</button>
+                <button id="json-action-copy-btn" type="button">Копіювати JSON</button>
+                <button class="close-modal-btn" type="button">Скасувати</button>
             </div>
         </div>
     </div>
