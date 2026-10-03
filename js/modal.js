@@ -437,6 +437,8 @@
     const copied = await copyTextToClipboard(JSON.stringify(item, null, 2))
     closeJsonActionModal()
     showInformationModal(copied ? "JSON скопійовано" : "Не вдалося скопіювати")
+    // Close the edit modal once the JSON is copied (uses its own "Скасувати" handler)
+    if (copied) $("#edit-modal-close")?.click()
   }
 
   // Save modal: copy the whole created list as a JSON array
