@@ -91,8 +91,82 @@ function isVoiceCommandText(text) {
   return /\b(next point|skip (?:this )?sentence|come up|show (?:the )?hint|got it|hide it|close (?:the )?hint|keep it|save (?:this )?sentence|say it|read (?:the )?sentence)\b/.test(commandText)
 }
 
+/* ---------- Speaking the phrase while the hint popup is open ----------
+   Besides the voice commands, the user can simply say the sentence shown in the
+   hint popup. If it is correct (case, punctuation and apostrophes ignored) the
+   popup closes and the next sentence is loaded. Only works while the red dot is
+   blinking (the app has finished speaking and the mic is listening). */
+let pendingHintPhraseTimer = null
+let pendingHintPhrase = null
+
+function normalizeSpokenText(text) {
+  return text.toLowerCase().replace(/[\u2019'`]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+}
+
+function isHintPopupListening() {
+  return popup.style.display === 'flex' && !voiceEngineActive &&
+    currentSentenceIndex !== null && !!sentences[currentSentenceIndex]
+}
+
+function isSpokenHintPhraseCorrect(text) {
+  if (!isHintPopupListening()) return false
+  const spoken = normalizeSpokenText(text)
+  return spoken !== '' && spoken === normalizeSpokenText(sentences[currentSentenceIndex].en)
+}
+
+// True if the speech is the (unfinished) beginning of the sentence shown in the
+// popup, so a command phrase inside it ("... keep it ...") is not run as a command.
+function isHintPhraseSpeech(text) {
+  if (!isHintPopupListening()) return false
+  const spoken = normalizeSpokenText(text)
+  if (!spoken || VOICE_COMMAND_PHRASES.includes(spoken)) return false
+  const target = normalizeSpokenText(sentences[currentSentenceIndex].en)
+  return spoken === target || target.startsWith(spoken + ' ')
+}
+
+function acceptSpokenHintPhrase() {
+  if (pendingHintPhraseTimer) clearTimeout(pendingHintPhraseTimer)
+  pendingHintPhraseTimer = null
+  pendingHintPhrase = null
+  // Same as a skipped/answered sentence: mark it as used and go to the next one.
+  if (!usedIndexes.includes(currentSentenceIndex)) {
+    usedIndexes.push(currentSentenceIndex)
+    localStorage.setItem("usedIndexes", JSON.stringify(usedIndexes))
+  }
+  hintMode = false // hidePopup() loads the next sentence when hintMode is false
+  hidePopup()
+}
+
+// Returns 'accepted' (popup closed), 'pending' (matches, waiting for the interim
+// result to stay stable) or null (not the phrase).
+function handleSpokenHintPhrase(index, text, isFinal) {
+  if (!isSpokenHintPhraseCorrect(text)) {
+    if (pendingHintPhrase?.index === index) {
+      clearTimeout(pendingHintPhraseTimer)
+      pendingHintPhraseTimer = null
+      pendingHintPhrase = null
+    }
+    return null
+  }
+  if (isFinal) {
+    acceptSpokenHintPhrase()
+    return 'accepted'
+  }
+  if (pendingHintPhrase?.index === index && pendingHintPhrase.text === text) return 'pending'
+  if (pendingHintPhraseTimer) clearTimeout(pendingHintPhraseTimer)
+  pendingHintPhrase = { index, text }
+  pendingHintPhraseTimer = setTimeout(() => {
+    const pending = pendingHintPhrase
+    pendingHintPhrase = null
+    pendingHintPhraseTimer = null
+    if (pending && isRecording && isSpokenHintPhraseCorrect(pending.text)) acceptSpokenHintPhrase()
+  }, VOICE_COMMAND_STABILITY_MS)
+  return 'pending'
+}
+
 // Runs a voice command if the text contains one. Returns true if handled.
 function runVoiceCommand(text) {
+  if (isHintPhraseSpeech(text)) return false
   const commandText = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
   if (/\b(next point|skip (?:this )?sentence)\b/.test(commandText)) {
     skipSentence()
@@ -176,6 +250,10 @@ function initSpeechRecognition() {
     // result list rather than treating each event as a fresh transcript.
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const transcript = event.results[i][0].transcript.trim()
+      // Hint popup is open: the user may say the sentence itself instead of a command.
+      const hintPhrase = handleSpokenHintPhrase(i, transcript, event.results[i].isFinal)
+      if (hintPhrase === 'accepted') return
+      if (hintPhrase === 'pending') continue
       if (event.results[i].isFinal) {
         if (pendingVoiceCommand?.index === i) {
           clearTimeout(pendingVoiceCommandTimer)
@@ -189,7 +267,7 @@ function initSpeechRecognition() {
         }
       } else {
         interimTranscript = transcript
-        if (!handledCommandResults.has(i) && isVoiceCommandText(transcript)) {
+        if (!handledCommandResults.has(i) && isVoiceCommandText(transcript) && !isHintPhraseSpeech(transcript)) {
           const samePending = pendingVoiceCommand?.index === i && pendingVoiceCommand.text === transcript
           if (!samePending) {
             if (pendingVoiceCommandTimer) clearTimeout(pendingVoiceCommandTimer)
