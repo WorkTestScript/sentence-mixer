@@ -1201,6 +1201,8 @@ if (voiceInputBtn) {
 initApp()
 
 function showRecognizedTextIndicator() {
+  // Clear the line under the input as soon as the recognised text is shown
+  resetSpokenLine()
   // Flash the input to show text was recognized
   if (userInput) {
     const originalBackground = userInput.style.backgroundColor
