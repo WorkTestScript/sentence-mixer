@@ -1085,15 +1085,29 @@ let popupSpokenBase = 0
 let popupSpokenCurrent = ""
 let popupSpokenChecked = false
 
+// The line is out of the layout flow; stretch it from 10px below the top of the
+// popup down to #popup-text (6px gap) so it uses all the free space there.
+function fitPopupSpokenLine() {
+  const content = popupSpokenLine.closest(".popup-content")
+  const textEl = document.getElementById("popup-text")
+  if (!content || !textEl) return
+  const room = textEl.getBoundingClientRect().top - content.getBoundingClientRect().top - 10 - 6
+  popupSpokenLine.style.height = Math.max(0, room) + "px"
+}
+
 function renderPopupSpokenLine(parts) {
   if (!popupSpokenLine) return
   popupSpokenLine.textContent = ""
+  if (!parts.length) return
+  fitPopupSpokenLine()
+  const inner = document.createElement("div")
   parts.forEach((part, index) => {
     const span = document.createElement("span")
     if (part.pending) span.className = "spoken-interim"
     span.textContent = (index ? " " : "") + part.text
-    popupSpokenLine.appendChild(span)
+    inner.appendChild(span)
   })
+  popupSpokenLine.appendChild(inner)
 }
 
 function resetPopupSpokenLine() {
