@@ -769,6 +769,7 @@ function showPopup(text, autoClose = false) {
 
 function hidePopup() {
   voiceEngine.stop()
+  resetPopupSpokenLine()
   setVoiceEngineActive(false);
   // Give the microphone a brief moment before trusting new results again,
   // so leftover audio from the answer we just spoke doesn't get written
@@ -783,6 +784,7 @@ function hidePopup() {
 }
 
 function speak(text, autoClose = false) {
+  resetPopupSpokenLine()
   setVoiceEngineActive(true);
   pauseRecognitionForSpeech()
   voiceEngine.speak(text, autoClose ? hidePopup : null, autoClose)
@@ -790,6 +792,7 @@ function speak(text, autoClose = false) {
 
 function speakCurrentSentence() {
   hintMode = true;
+  resetPopupSpokenLine()
   setVoiceEngineActive(true);
   pauseRecognitionForSpeech()
 
@@ -1071,6 +1074,66 @@ let spokenResultsLen = 0  // number of results seen in the current recognition s
 let spokenCurrent = ""    // text currently shown
 let spokenChecked = false // every result of the attempt is final (answer was checked)
 
+/* ---------- The same line inside the hint popup ----------
+   While the hint popup is open the line under the input is covered, so the
+   recognised words are shown in the popup instead (above the red dot). It works
+   like the line under the input: words are kept while the popup is open, and a
+   new attempt after a finished (wrong) one starts a fresh line. */
+const popupSpokenLine = document.getElementById("popup-spoken-line")
+let popupSpokenPrefix = ""
+let popupSpokenBase = 0
+let popupSpokenCurrent = ""
+let popupSpokenChecked = false
+
+function renderPopupSpokenLine(parts) {
+  if (!popupSpokenLine) return
+  popupSpokenLine.textContent = ""
+  parts.forEach((part, index) => {
+    const span = document.createElement("span")
+    if (part.pending) span.className = "spoken-interim"
+    span.textContent = (index ? " " : "") + part.text
+    popupSpokenLine.appendChild(span)
+  })
+}
+
+function resetPopupSpokenLine() {
+  popupSpokenPrefix = ""
+  popupSpokenBase = 0
+  popupSpokenCurrent = ""
+  popupSpokenChecked = false
+  renderPopupSpokenLine([])
+}
+
+function updatePopupSpokenLine(results, previousLength) {
+  let items = []
+  let anyPending = false
+  for (let i = popupSpokenBase; i < results.length; i++) {
+    const text = results[i][0].transcript.trim()
+    const pending = !results[i].isFinal
+    if (!text) continue
+    // Commands are not shown - unless it is the (start of the) sentence being read.
+    if ((isVoiceCommandText(text) || (pending && isPartialVoiceCommand(text))) && !isHintPhraseSpeech(text)) continue
+    if (pending) anyPending = true
+    items.push({ index: i, text, pending })
+  }
+
+  // New speech after a finished attempt -> fresh line
+  if (popupSpokenChecked && items.some((item) => item.index >= previousLength)) {
+    popupSpokenPrefix = ""
+    popupSpokenBase = previousLength
+    popupSpokenChecked = false
+    items = items.filter((item) => item.index >= previousLength)
+  }
+
+  const parts = []
+  if (popupSpokenPrefix) parts.push({ text: popupSpokenPrefix, pending: false })
+  items.forEach((item) => parts.push({ text: item.text, pending: item.pending }))
+
+  if (items.length) popupSpokenChecked = !anyPending
+  popupSpokenCurrent = parts.map((part) => part.text).join(" ")
+  renderPopupSpokenLine(parts)
+}
+
 function renderSpokenLine(parts) {
   if (!spokenLine) return
   spokenLine.textContent = ""
@@ -1087,6 +1150,8 @@ function rebaseSpokenLine() {
   spokenPrefix = spokenCurrent
   spokenBase = 0
   spokenResultsLen = 0
+  popupSpokenPrefix = popupSpokenCurrent
+  popupSpokenBase = 0
 }
 
 function resetSpokenLine() {
@@ -1097,6 +1162,7 @@ function resetSpokenLine() {
   spokenBase = spokenResultsLen
   spokenChecked = false
   renderSpokenLine([])
+  resetPopupSpokenLine()
 }
 
 // Command phrases (same as in runVoiceCommand). A result that is only the beginning
@@ -1130,6 +1196,7 @@ function updateSpokenLine(event) {
   if (popup.style.display === "flex") {
     spokenPrefix = spokenCurrent
     spokenBase = results.length
+    updatePopupSpokenLine(results, previousLength)
     return
   }
 
@@ -1207,6 +1274,7 @@ if (voiceInputBtn && spokenLine) {
   new MutationObserver(() => {
     const recording = voiceInputBtn.classList.contains("recording")
     spokenLine.classList.toggle("active", recording)
+    if (popupSpokenLine) popupSpokenLine.classList.toggle("active", recording)
     if (!recording) resetSpokenLine()
   }).observe(voiceInputBtn, { attributes: true, attributeFilter: ["class"] })
 }

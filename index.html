@@ -33,6 +33,19 @@
             box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
         }
         .voice-status.active span { animation: voice-status-blink 1s ease-in-out infinite; }
+        /* Recognised words inside the hint popup (above the red dot); shown only while the mic is on. */
+        .popup-spoken-line {
+            display: none;
+            min-height: 24px;
+            margin-bottom: 6px;
+            text-align: center;
+            font-size: 1rem;
+            line-height: 1.5;
+            opacity: 0.85;
+            overflow-wrap: anywhere;
+        }
+        .popup-spoken-line.active { display: block; }
+        .popup-spoken-line .spoken-interim { opacity: 0.6; }
         @keyframes voice-status-blink {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.2; }
@@ -131,6 +144,7 @@
         <div class="popup-content">
             <button id="close-popup">×</button>
             <div class="popup-text-container">
+                <div id="popup-spoken-line" class="popup-spoken-line" aria-live="polite"></div>
                 <div id="voice-status" class="voice-status" aria-hidden="true"><span></span></div>
                 <span id="popup-text"></span>
                 <div id="example-text" class="example-text"></div>
