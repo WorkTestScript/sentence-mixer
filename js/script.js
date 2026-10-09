@@ -902,7 +902,7 @@ let settingsTimeout = null
 
 // Add event listener for keydown events
 document.addEventListener('keydown', (e) => {
-  if (e.ctrlKey || e.key === 'F12') {
+  if (e.key === 'F12') {
     e.preventDefault()
     skipSentence()
     return
