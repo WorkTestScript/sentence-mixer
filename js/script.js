@@ -88,7 +88,7 @@ const VOICE_COMMAND_STABILITY_MS = 220
 
 function isVoiceCommandText(text) {
   const commandText = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-  return /\b(next point|skip (?:this )?sentence|come up|show (?:the )?hint|got it|hide it|close (?:the )?hint|keep it|save (?:this )?sentence|say it|read (?:the )?sentence)\b/.test(commandText)
+  return /\b(next point|skip (?:this )?sentence|come up|show (?:the )?hint|got it|close (?:the )?hint|keep it|save (?:this )?sentence|say it|read (?:the )?sentence)\b/.test(commandText)
 }
 
 /* ---------- Speaking the phrase while the hint popup is open ----------
@@ -176,7 +176,7 @@ function runVoiceCommand(text) {
     showHint()
     return true
   }
-  if (/\b(got it|hide it|close (?:the )?hint)\b/.test(commandText)) {
+  if (/\b(got it|close (?:the )?hint)\b/.test(commandText)) {
     if (popup.style.display === 'flex') {
       hidePopup()
       return true
@@ -217,13 +217,31 @@ function initSpeechRecognition() {
   recognition.interimResults = true
   recognition.lang = 'en-US' // English language
 
+  // onstart only means "the recogniser was started"; the microphone is really
+  // capturing a moment later (onaudiostart). A command spoken in between loses its
+  // first syllable - this is what hurt the hint popup, where the recogniser is
+  // restarted after every spoken hint. The red dot therefore waits for onaudiostart.
+  let micSessionId = 0
+  recognition.onaudiostart = function () {
+    micReady = true
+    refreshSpeechIndicator()
+  }
+
   recognition.onstart = function () {
     handledCommandResults.clear()
     if (pendingVoiceCommandTimer) clearTimeout(pendingVoiceCommandTimer)
     pendingVoiceCommandTimer = null
     pendingVoiceCommand = null
     rebaseSpokenLine()
-    micReady = true
+    // Fallback if a browser never fires onaudiostart: show the dot after 1.2 s anyway.
+    micReady = false
+    const sessionId = ++micSessionId
+    setTimeout(() => {
+      if (sessionId === micSessionId && isRecording && !micReady) {
+        micReady = true
+        refreshSpeechIndicator()
+      }
+    }, 1200)
     isRecording = true
     voiceInputActive = true
     permissionGranted = true
@@ -370,6 +388,7 @@ function initSpeechRecognition() {
   }
 
   recognition.onend = function () {
+    micSessionId++
     micReady = false
     refreshSpeechIndicator()
     // Only stop if permission was revoked or there's an error
@@ -1085,7 +1104,7 @@ function resetSpokenLine() {
 // whether it is a command or part of the sentence.
 const VOICE_COMMAND_PHRASES = [
   "next point", "skip sentence", "skip this sentence", "come up", "show hint", "show the hint",
-  "got it", "hide it", "close hint", "close the hint", "keep it", "save sentence",
+  "got it", "close hint", "close the hint", "keep it", "save sentence",
   "save this sentence", "say it", "read sentence", "read the sentence",
 ]
 
