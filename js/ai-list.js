@@ -65,6 +65,10 @@
     const apiKey = currentKey()
     if (!entries.length) { status.textContent = "Додайте хоча б один рядок."; return }
     if (entries.length > 50) { status.textContent = `Забагато рядків: ${entries.length}. Максимум — 50 за один раз.`; return }
+    if (entries.some((entry) => /[\u0400-\u04FF]/u.test(entry))) {
+      status.textContent = "Введіть слова чи речення англійською мовою."
+      return
+    }
     if (!apiKey) {
       status.textContent = `Вкажіть ${selected.label} API key.`
       syncProvider(); apiKeyModal.style.display = "flex"; apiKeyInput.focus(); return
@@ -76,7 +80,11 @@
       if (!models.length) throw new Error(`Не знайдено сумісних моделей ${selected.label}. Перевірте API key.`)
       let generated, lastError
       for (const [index, model] of models.entries()) {
-        status.textContent = `Перевіряю модель ${index + 1} із ${models.length}: ${model.resolvedModelId || model.id}…`
+        const modelName = model.resolvedModelId || model.id
+        const startedAt = Date.now()
+        const updateTimer = () => { status.textContent = `Модель: ${modelName} · очікування: ${Math.floor((Date.now() - startedAt) / 1000)} с` }
+        updateTimer()
+        const timer = setInterval(updateTimer, 250)
         try {
           generated = selected === providers.google
             ? await generateGoogle(apiKey, model, buildPrompt(entries))
@@ -84,7 +92,9 @@
           if (generated) break
         } catch (error) {
           lastError = error.message
-          status.textContent = `Модель ${model.resolvedModelId || model.id} недоступна. Пробую наступну…`
+          status.textContent = `Модель ${modelName} не відповіла. Пробую наступну…`
+        } finally {
+          clearInterval(timer)
         }
       }
       if (!generated) throw new Error(lastError || `Не вдалося звернутися до ${selected.label} API.`)
