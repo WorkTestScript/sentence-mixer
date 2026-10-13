@@ -93,14 +93,14 @@
         </div>
     </div>
 
-    <div id="ai-list-modal" class="modal ai-list-modal" role="dialog" aria-modal="true" aria-labelledby="ai-list-title">
+    <div id="ai-list-modal" class="modal ai-list-modal" role="dialog" aria-modal="true" aria-label="Створення списку за допомогою AI">
         <div class="modal-content">
-            <h3 id="ai-list-title">Створити список за допомогою AI</h3>
-            <p>Вставте англійські слова або речення, по одному в рядок. За один раз можна додати до 50 рядків.</p>
+            <label for="ai-provider">Мовна модель</label>
+            <select id="ai-provider"><option value="google">Google Gemini</option><option value="groq">Groq</option></select>
             <label for="ai-list-input">Слова чи речення</label>
             <div class="ai-input-editor">
                 <div id="ai-list-highlight" aria-hidden="true"></div>
-                <textarea id="ai-list-input" rows="10" placeholder="carry out&#10;common&#10;break the ice"></textarea>
+                <textarea id="ai-list-input" rows="10"></textarea>
             </div>
             <p id="ai-list-status" role="status" aria-live="polite"></p>
             <div class="modal-control">
@@ -113,10 +113,10 @@
 
     <div id="ai-api-key-modal" class="modal ai-api-key-modal" role="dialog" aria-modal="true" aria-labelledby="ai-api-key-title">
         <div class="modal-content">
-            <h3 id="ai-api-key-title">Gemini API key</h3>
-            <label for="gemini-api-key">API key</label>
-            <input id="gemini-api-key" type="password" autocomplete="off" placeholder="Вставте API key">
-            <p class="ai-key-help">Ключ зберігається лише у localStorage цього браузера. Для запитів без оплати використовуйте ключ проєкту Free Tier. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Отримати API key у Google AI Studio</a></p>
+            <h3 id="ai-api-key-title">API key</h3>
+            <label for="ai-api-key">API key</label>
+            <input id="ai-api-key" type="password" autocomplete="off" placeholder="Вставте API key">
+            <p id="ai-key-help" class="ai-key-help"></p>
             <div class="modal-control">
                 <button id="ai-api-key-cancel" type="button">Скасувати</button>
                 <button id="ai-api-key-save" type="button">Зберегти</button>
