@@ -171,11 +171,35 @@ class VoiceEngine {
   }
 
   /**
+   * Speak once, preferring the Google engine whenever there is internet.
+   * Used by the "speaker" buttons in the editor. Offline (or if Google
+   * fails after a few quick retries) it falls back to the system voice.
+   * @param {string} text - Text to speak
+   * @param {function} onEnd - Callback function when speech ends
+   */
+  speakPreferGoogle(text, onEnd = null) {
+    if (!this.isInitialized) return;
+
+    const isOnline = typeof navigator === "undefined" || navigator.onLine !== false;
+    if (isOnline) {
+      const googleVoice =
+        GOOGLE_VOICES.find((v) => v.id === this.voiceSelect.value) || GOOGLE_VOICES[0];
+      this.speakWithGoogle(text, googleVoice, onEnd, { maxRetries: 3 });
+    } else {
+      this.speakWithSystemVoice(text, onEnd);
+    }
+  }
+
+  /**
    * Speak using the browser's own speechSynthesis (the original behavior).
    * @param {string} text - Text to speak
    * @param {function} onEnd - Callback function when speech ends
    */
   speakWithSystemVoice(text, onEnd = null) {
+    // Never queue on top of something that is already being spoken
+    // (speechSynthesis.speak() queues utterances, which sounds like a repeat).
+    this.stop();
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice =
       speechSynthesis.getVoices().find((voice) => voice.name === this.voiceSelect.value) ||
@@ -266,9 +290,14 @@ class VoiceEngine {
    * @param {string} text - Text to speak
    * @param {{id:string,label:string,locale:string}} voiceInfo
    * @param {function} onEnd - Callback function when speech ends
+   * @param {{maxRetries?:number}} options - maxRetries overrides the retry limit
    */
-  speakWithGoogle(text, voiceInfo, onEnd = null) {
+  speakWithGoogle(text, voiceInfo, onEnd = null, options = {}) {
     this.stop();
+
+    const maxRetries = Number.isFinite(options.maxRetries)
+      ? options.maxRetries
+      : GOOGLE_TTS_MAX_RETRIES_PER_UTTERANCE;
 
     const queue = this.splitTextForGoogleTTS(text);
     if (queue.length === 0) {
@@ -303,6 +332,10 @@ class VoiceEngine {
     let currentChunk = null;
     let retryCountForChunk = 0;
     let totalRetryCount = 0;
+    // Identifies the latest load attempt. Every retry replaces audio.src,
+    // which makes the PREVIOUS play() promise reject; without this check that
+    // stale rejection scheduled one more retry, restarting the same text.
+    let attemptId = 0;
 
     const clearRecoveryTimer = () => {
       clearTimeout(recoveryTimer);
@@ -325,6 +358,11 @@ class VoiceEngine {
     const fallbackToSystemVoice = () => {
       if (cancelled) return;
       clearRecoveryTimer();
+      try {
+        audio.pause();
+      } catch (e) {
+        // ignore
+      }
       this._googleAudio = null;
       console.log("Google voice not responding after repeated retries, falling back to the system voice.");
       this.speakWithSystemVoice(text, onEnd);
@@ -341,21 +379,27 @@ class VoiceEngine {
     };
 
     const loadAndPlay = () => {
+      const myAttempt = ++attemptId;
       audio.src = this.getGoogleTTSUrl(voiceInfo, currentChunk, retryCountForChunk);
       audio.playbackRate = effectiveRate;
       scheduleStallRecovery();
       audio.play().then(() => {
+        if (myAttempt !== attemptId) return;
         // Some browsers only honor playbackRate once playback has actually
         // started, so set it once more right after play() resolves.
         audio.playbackRate = effectiveRate;
-      }).catch(scheduleQuickRetry);
+      }).catch(() => {
+        // Ignore rejections from superseded attempts or a cancelled utterance
+        if (cancelled || myAttempt !== attemptId) return;
+        scheduleQuickRetry();
+      });
     };
 
     const retryCurrentChunk = () => {
       if (cancelled || !currentChunk) return;
 
       totalRetryCount++;
-      if (totalRetryCount > GOOGLE_TTS_MAX_RETRIES_PER_UTTERANCE) {
+      if (totalRetryCount > maxRetries) {
         fallbackToSystemVoice();
         return;
       }

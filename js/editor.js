@@ -216,7 +216,7 @@ function renderSentences() {
       e.preventDefault()
       e.stopPropagation()
       if (typeof voiceEngine !== "undefined") {
-        voiceEngine.speak(pair.en)
+        voiceEngine.speakPreferGoogle(pair.en)
       }
     })
 
