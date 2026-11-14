@@ -19,26 +19,42 @@
   font-size: 28px;
 }
 
+.list-page .controls,
+.list-modal .controls,
+.list-header .controls,
 .controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
 }
 
-.controls .btn {
-  flex-shrink: 0;
+.list-page .controls #toggleLanguage,
+.list-modal #toggleLanguage,
+#toggleLanguage {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  margin: 0 !important;
 }
 
+.list-page .controls .search-container,
+.list-modal .search-container,
 .search-container {
-  flex-grow: 1;
-  min-width: 220px;
-  position: relative;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  position: static !important;
+  margin: 0 !important;
 }
 
+.list-page .controls #searchInput,
+.list-modal #searchInput,
 #searchInput {
-  width: 100%;
+  width: 100% !important;
+  display: block !important;
+  margin: 0 !important;
 }
 
 /* Sentence list */
@@ -136,13 +152,14 @@
   height: 100%;
   background: transparent;
   backdrop-filter: none;
-  z-index: 1000;
+  z-index: 1050;
   overflow: auto;
   justify-content: center;
   align-items: center;
   padding: 20px;
 }
 
+#translationModal > div,
 #translationModal .modal-content {
   background: var(--card-bg);
   margin: 0;
@@ -151,39 +168,40 @@
   width: 100%;
   max-width: 520px;
   position: relative;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
+  border: 3px solid var(--border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
   animation: modal-in 0.18s ease;
 }
 
 /* Search results dropdown */
 #searchModal {
   display: none;
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  width: 100%;
+  position: absolute !important;
+  top: 76px;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 80% !important;
   height: auto;
   background: transparent;
   backdrop-filter: none;
-  justify-content: flex-start;
+  justify-content: center !important;
   align-items: flex-start;
-  z-index: 1000;
+  z-index: 1010;
   padding: 0;
   overflow: visible;
   pointer-events: none;
 }
 
+#searchModal > div,
 #searchModal .modal-content {
   background: var(--card-bg);
-  margin: 0;
+  margin: 0 auto;
   padding: 6px;
   border-radius: var(--radius-md);
-  width: 100%;
-  max-width: 100%;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
+  width: 100% !important;
+  max-width: 100% !important;
+  border: 3px solid var(--border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
   animation: modal-in 0.18s ease;
   pointer-events: auto;
 }
@@ -302,8 +320,9 @@
   }
 
   .controls {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 8px;
   }
 
   .search-container {
@@ -326,3 +345,45 @@
 .favorite-icon.active svg {
   fill: currentColor;
 }
+
+/* List modal overlay and window */
+.list-modal {
+  z-index: 1000;
+}
+
+#listModal > .modal-content,
+.list-modal .list-modal-content {
+  container-type: inline-size;
+  max-width: 840px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  padding: 32px 24px 24px;
+}
+
+.list-modal .list-page {
+  padding: 0;
+  max-width: 100%;
+}
+
+.close-list-modal-btn {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-muted);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px !important;
+  transition: all var(--transition);
+  z-index: 20;
+}
+
+.close-list-modal-btn:hover {
+  color: var(--text) !important;
+  transform: scale(1.15);
+}
+

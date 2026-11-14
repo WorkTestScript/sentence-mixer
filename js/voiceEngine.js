@@ -383,7 +383,6 @@ class VoiceEngine {
       playNextChunk();
     });
     audio.addEventListener("error", retryCurrentChunk);
-    audio.addEventListener("stalled", retryCurrentChunk);
 
     playNextChunk();
   }

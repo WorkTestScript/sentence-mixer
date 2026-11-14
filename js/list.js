@@ -8,16 +8,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const sentencesList = $("sentencesList")
   const toggleLanguageBtn = $("toggleLanguage")
   const searchInput = $("searchInput")
+  const listModal = $("listModal")
   const translationModal = $("translationModal")
   const searchModal = $("searchModal")
   const translationText = $("translationText")
   const translationExampleText = $("translationExampleText")
   const searchResults = $("searchResults")
-  const closeBtns = document.querySelectorAll(".close-btn")
   const voiceBtn = $("voiceBtn")
+  const openListBtn = $("list-open-modal-btn") || document.querySelector(".list-open-modal")
 
   let currentLanguage = "en"
-  const sentences = JSON.parse(localStorage.getItem("sentences")) || []
+
+  const getSentences = () => {
+    try {
+      const value = JSON.parse(localStorage.getItem("sentences"))
+      return Array.isArray(value) ? value : []
+    } catch {
+      return []
+    }
+  }
+
+  let sentences = getSentences()
 
   const readSaved = () => {
     try {
@@ -53,9 +64,11 @@ document.addEventListener("DOMContentLoaded", () => {
     icon.classList.toggle("active", isSaved(readSaved(), sentence))
   }
 
-  /* ---------- Voice engine (dummy controls) ---------- */
+  /* ---------- Voice engine (uses existing engine or fallback) ---------- */
 
   function initializeVoiceEngine() {
+    if (typeof voiceEngine === "undefined") return
+    if (voiceEngine.isInitialized) return
     const dummySelect = document.createElement("select")
     const dummySpeed = document.createElement("input")
     const dummyPitch = document.createElement("input")
@@ -71,12 +84,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function speakTranslation() {
     const text = translationText.textContent
-    if (text) voiceEngine.speak(text)
+    if (text && typeof voiceEngine !== "undefined") voiceEngine.speak(text)
   }
 
   /* ---------- Rendering ---------- */
 
   function displaySentences() {
+    if (!sentencesList) return
+    sentences = getSentences()
     sentencesList.innerHTML = ""
 
     if (sentences.length === 0) {
@@ -123,11 +138,13 @@ document.addEventListener("DOMContentLoaded", () => {
       li.addEventListener("click", () => showTranslation(sentence))
       voiceButton.addEventListener("click", (e) => {
         e.stopPropagation()
-        voiceEngine.speak(sentence.en)
+        if (typeof voiceEngine !== "undefined") {
+          voiceEngine.speak(sentence.en)
+        }
       })
       favorite.addEventListener("click", (e) => {
         e.stopPropagation()
-        saveSentenceToFavorites(sentence)
+        toggleFavoriteSentence(sentence)
         syncFavoriteIcons()
       })
 
@@ -162,18 +179,21 @@ document.addEventListener("DOMContentLoaded", () => {
   /* ---------- Search ---------- */
 
   function handleSearch() {
+    if (!searchInput) return
     const term = searchInput.value.trim().toLowerCase()
     if (term.length < 2) {
-      closeModal(searchModal)
+      if (searchModal) closeModal(searchModal)
       return
     }
+    sentences = getSentences()
     const results = sentences.filter(
-      (s) => s.en.toLowerCase().includes(term) || s.ua.toLowerCase().includes(term)
+      (s) => (s.en && s.en.toLowerCase().includes(term)) || (s.ua && s.ua.toLowerCase().includes(term))
     )
     displaySearchResults(results)
   }
 
   function displaySearchResults(results) {
+    if (!searchResults) return
     searchResults.innerHTML = ""
 
     if (results.length === 0) {
@@ -221,46 +241,74 @@ document.addEventListener("DOMContentLoaded", () => {
 
         voiceButton.addEventListener("click", (e) => {
           e.stopPropagation()
-          voiceEngine.speak(result.en)
+          if (typeof voiceEngine !== "undefined") {
+            voiceEngine.speak(result.en)
+          }
         })
         favorite.addEventListener("click", (e) => {
           e.stopPropagation()
-          saveSentenceToFavorites(result)
+          toggleFavoriteSentence(result)
           syncFavoriteIcons()
         })
       })
     }
 
-    openModal(searchModal)
+    if (searchModal) {
+      updateSearchModalPosition()
+      openModal(searchModal)
+    }
   }
 
-  /* ---------- Favorites ---------- */
+  function updateSearchModalPosition() {
+    if (!listModal || !searchModal) return
+    const input = $("searchInput")
+    const listModalContent = listModal.querySelector(".modal-content")
+    if (input && listModalContent) {
+      const inputRect = input.getBoundingClientRect()
+      const contentRect = listModalContent.getBoundingClientRect()
+      const topOffset = inputRect.bottom - contentRect.top + 8
+      searchModal.style.top = `${topOffset}px`
+    }
+  }
 
-  function saveSentenceToFavorites(sentence) {
+  /* ---------- Favorites (Toggle Add / Remove) ---------- */
+
+  function toggleFavoriteSentence(sentence) {
     const stored = readSaved()
-    const exists = stored.some((s) => s.ua === sentence.ua && s.en === sentence.en)
+    const index = stored.findIndex((s) => s.ua === sentence.ua && s.en === sentence.en)
 
-    if (!exists) {
-      stored.push(sentence)
+    if (index === -1) {
+      stored.push({
+        ua: sentence.ua,
+        en: sentence.en,
+        example: sentence.example || "",
+      })
       localStorage.setItem("saveSelected", JSON.stringify(stored))
       window.dispatchEvent(new Event("saveSelectedChanged"))
       showNotification("Речення додано до списку")
     } else {
-      showNotification("Речення вже у списку")
+      stored.splice(index, 1)
+      localStorage.setItem("saveSelected", JSON.stringify(stored))
+      window.dispatchEvent(new Event("saveSelectedChanged"))
+      showNotification("Речення видалено зі списку")
     }
   }
 
   /* ---------- Helpers ---------- */
 
   const openModal = (modal) => {
-    modal.style.display = "flex"
+    if (modal) modal.style.display = "flex"
   }
 
   const closeModal = (modal) => {
-    modal.style.display = "none"
+    if (modal) modal.style.display = "none"
   }
 
   function showNotification(message) {
+    if (typeof showInformationModal === "function") {
+      showInformationModal(message)
+      return
+    }
     let notification = document.querySelector(".notification")
     if (!notification) {
       notification = document.createElement("div")
@@ -272,32 +320,59 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => notification.classList.remove("show"), 3000)
   }
 
+  /* ---------- Open list modal ---------- */
+
+  function openListModal() {
+    if (!listModal) return
+    sentences = getSentences()
+    displaySentences()
+    syncFavoriteIcons()
+    openModal(listModal)
+  }
+
   /* ---------- Wire up ---------- */
 
   displaySentences()
   initializeVoiceEngine()
 
-  toggleLanguageBtn.addEventListener("click", toggleLanguage)
-  searchInput.addEventListener("input", handleSearch)
-  voiceBtn.addEventListener("click", speakTranslation)
+  if (openListBtn) {
+    openListBtn.addEventListener("click", openListModal)
+  }
+
+  if (toggleLanguageBtn) {
+    toggleLanguageBtn.addEventListener("click", toggleLanguage)
+  }
+  if (searchInput) {
+    searchInput.addEventListener("input", handleSearch)
+  }
+  if (voiceBtn) {
+    voiceBtn.addEventListener("click", speakTranslation)
+  }
+
   window.addEventListener("saveSelectedChanged", syncFavoriteIcons)
+  window.addEventListener("resize", updateSearchModalPosition)
   window.addEventListener("storage", (e) => {
     if (e.key === "saveSelected" || e.key === null) syncFavoriteIcons()
+    if (e.key === "sentences" || e.key === null) displaySentences()
   })
 
   window.addEventListener("click", (event) => {
-    if (event.target === translationModal) closeModal(translationModal)
-    const searchVisible = searchModal.style.display !== "none"
-    if (searchVisible && !event.target.closest(".search-container")) {
-      searchInput.value = ""
+    if (listModal && event.target === listModal) closeModal(listModal)
+    if (translationModal && event.target === translationModal) closeModal(translationModal)
+    const searchVisible = searchModal && searchModal.style.display !== "none"
+    if (searchVisible && !event.target.closest(".search-container") && !event.target.closest("#searchModal")) {
+      if (searchInput) searchInput.value = ""
       closeModal(searchModal)
     }
   })
 
+  const closeBtns = document.querySelectorAll(".close-btn, .close-list-modal-btn")
   closeBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
       const modal = btn.closest(".modal")
       if (modal) closeModal(modal)
     })
   })
+
+  window.openListModal = openListModal
 })

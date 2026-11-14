@@ -206,9 +206,24 @@ function renderSentences() {
     const num = document.createElement("span")
     num.textContent = sentences.length - i
 
+    const voiceBtn = document.createElement("button")
+    voiceBtn.type = "button"
+    voiceBtn.className = "sentence-voice-btn"
+    voiceBtn.title = "Проголосити"
+    voiceBtn.innerHTML =
+      '<div class="speaker-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg></div>'
+    voiceBtn.addEventListener("click", (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (typeof voiceEngine !== "undefined") {
+        voiceEngine.speak(pair.en)
+      }
+    })
+
     actions.appendChild(editBtn)
     actions.appendChild(delBtn)
     actions.appendChild(num)
+    actions.appendChild(voiceBtn)
 
     card.appendChild(content)
     card.appendChild(actions)
@@ -458,6 +473,31 @@ window.addEventListener("dataLoaded", () => setTimeout(renderSentences, 100))
 window.addEventListener("storage", (e) => {
   if (e.key === STORAGE_KEY) setTimeout(renderSentences, 100)
 })
+
+function initializeVoiceEngine() {
+  if (typeof voiceEngine === "undefined") return
+  if (voiceEngine.isInitialized) return
+  const dummySelect = document.createElement("select")
+  const dummySpeed = document.createElement("input")
+  const dummyPitch = document.createElement("input")
+  const dummyVolume = document.createElement("input")
+  dummySpeed.type = "range"
+  dummyPitch.type = "range"
+  dummyVolume.type = "range"
+  dummySpeed.value = localStorage.getItem("speed") || 1
+  dummyPitch.value = localStorage.getItem("pitch") || 1
+  dummyVolume.value = localStorage.getItem("volume") || 1
+  voiceEngine.init(dummySelect, dummySpeed, dummyPitch, dummyVolume)
+}
+
+initializeVoiceEngine()
+if (typeof speechSynthesis !== "undefined") {
+  speechSynthesis.addEventListener("voiceschanged", () => {
+    if (typeof voiceEngine !== "undefined" && voiceEngine.isInitialized) {
+      voiceEngine.loadVoices()
+    }
+  })
+}
 
 renderForm()
 renderSentences()

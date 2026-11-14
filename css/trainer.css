@@ -363,19 +363,19 @@
   margin: 0 auto;
 }
 
-.controls {
+.settings-grid .controls {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.controls label {
+.settings-grid .controls label {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
 }
 
-.controls .value {
+.settings-grid .controls .value {
   color: var(--accent);
   font-weight: 700;
 }

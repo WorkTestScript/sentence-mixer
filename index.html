@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/trainer.css">
+    <link rel="stylesheet" href="css/list.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <title>Sentence Mixer</title>
 </head>
@@ -17,9 +18,9 @@
     <nav id="navbar">
         <ul>
             <li><a href="index.html" class="active">Тренування</a></li>
-            <li><a href="pages/editor.html">Створити список</a></li>
-            <li><a href="pages/list.html" target="_blank">Оглянути список</a></li>
-            <li><button class="load-replace-open-modal">Завантажити список</button></li>
+            <li><a href="pages/editor.html">Редактор</a></li>
+            <li><button id="list-open-modal-btn" class="list-open-modal">Список</button></li>
+            <li><button class="load-replace-open-modal">Завантажити файл</button></li>
             <li><button class="save-selected-open-modal">Зберегти вибране</button></li>
         </ul>
     </nav>
@@ -155,9 +156,53 @@
         </div>
     </div>
 
+    <!-- List Modal -->
+    <div id="listModal" class="list-modal modal">
+        <div class="modal-content list-modal-content">
+            <button class="close-list-modal-btn close-modal-btn" title="Закрити">×</button>
+            <div class="list-page">
+                <header class="list-header">
+                    <div class="controls">
+                        <button id="toggleLanguage" class="btn">Show Ukrainian</button>
+                        <div class="search-container">
+                            <input type="text" id="searchInput" placeholder="Пошук речень..." autocomplete="off">
+                            <div id="searchModal" class="modal">
+                                <div class="modal-content">
+                                    <ul id="searchResults" class="search-results"></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <main>
+                    <ul id="sentencesList" class="sentences-list"></ul>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Translation Modal -->
+    <div id="translationModal" class="modal">
+        <div class="modal-content">
+            <div class="translation-container">
+                <div class="translation-text-container">
+                    <p id="translationText"></p>
+                    <div id="translationExampleText" class="example-text"></div>
+                </div>
+                <button id="voiceBtn" class="voice-btn" title="Проголосити">
+                    <div class="speaker-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/theme.js"></script>
     <script src="js/voiceEngine.js" defer></script>
     <script src="js/modal.js" defer></script>
+    <script src="js/list.js" defer></script>
     <script src="js/script.js" defer></script>
 </body>
 

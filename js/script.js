@@ -768,6 +768,7 @@ function showPopup(text, autoClose = false) {
 }
 
 function hidePopup() {
+  if (popup.style.display !== "flex") return
   voiceEngine.stop()
   resetPopupSpokenLine()
   setVoiceEngineActive(false);
@@ -832,10 +833,17 @@ function showHint() {
 function saveSentenceToLocalStorage() {
   const storedSentences = JSON.parse(localStorage.getItem("saveSelected")) || []
   const currentSentence = sentences[currentSentenceIndex]
-  if (
-    currentSentence &&
-    !storedSentences.some((item) => item.ua === currentSentence.ua && item.en === currentSentence.en)
-  ) {
+  if (!currentSentence) return
+
+  const existingIndex = storedSentences.findIndex((item) => item.ua === currentSentence.ua && item.en === currentSentence.en)
+  if (existingIndex !== -1) {
+    storedSentences.splice(existingIndex, 1)
+    localStorage.setItem("saveSelected", JSON.stringify(storedSentences))
+    try {
+      window.dispatchEvent(new Event('saveSelectedChanged'))
+    } catch (e) { }
+    showInformationModal("Речення видалено зі списку")
+  } else {
     // Ensure we save in the new format with example property
     const sentenceToSave = {
       ua: currentSentence.ua,
@@ -848,8 +856,8 @@ function saveSentenceToLocalStorage() {
       // notify other modules to update UI
       window.dispatchEvent(new Event('saveSelectedChanged'))
     } catch (e) { }
+    showInformationModal("Речення в списку")
   }
-  showInformationModal("Речення в спискy")
   hidePopup()
   userInput.focus()
 }
@@ -858,10 +866,15 @@ function saveSentenceToLocalStorage() {
 function saveSentenceToLocalStorageNoAdvance() {
   const storedSentences = JSON.parse(localStorage.getItem("saveSelected")) || []
   const currentSentence = sentences[currentSentenceIndex]
-  if (
-    currentSentence &&
-    !storedSentences.some((item) => item.ua === currentSentence.ua && item.en === currentSentence.en)
-  ) {
+  if (!currentSentence) return
+
+  const existingIndex = storedSentences.findIndex((item) => item.ua === currentSentence.ua && item.en === currentSentence.en)
+  if (existingIndex !== -1) {
+    storedSentences.splice(existingIndex, 1)
+    localStorage.setItem("saveSelected", JSON.stringify(storedSentences))
+    try { window.dispatchEvent(new Event('saveSelectedChanged')) } catch (e) { }
+    showInformationModal("Речення видалено зі списку")
+  } else {
     const sentenceToSave = {
       ua: currentSentence.ua,
       en: currentSentence.en,
@@ -870,8 +883,8 @@ function saveSentenceToLocalStorageNoAdvance() {
     storedSentences.push(sentenceToSave)
     localStorage.setItem("saveSelected", JSON.stringify(storedSentences))
     try { window.dispatchEvent(new Event('saveSelectedChanged')) } catch (e) { }
+    showInformationModal("Речення в списку")
   }
-  showInformationModal("Речення в спискy")
   // Keep the current sentence visible; do not call hidePopup() or getRandomSentence()
   userInput.focus()
 }

@@ -219,6 +219,18 @@
   font-size: 15px;
 }
 
+.buttons .sentence-voice-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.buttons .sentence-voice-btn .speaker-icon {
+  width: 18px;
+  height: 18px;
+}
+
 /* Pagination */
 .pagination {
   display: flex;
