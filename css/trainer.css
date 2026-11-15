@@ -692,15 +692,21 @@
 .input-column {
   flex: 1;
   min-width: 0;
+  position: relative;
 }
 
 /* Spoken line under the input (shown only while the microphone is on).
    Horizontal padding is the same as the input text's (14px left / 62px right,
-   where the mic button sits), so both texts are centred on the same axis. */
+   where the mic button sits), so both texts are centred on the same axis.
+   It is absolutely positioned so appearing/disappearing never changes the row
+   height - otherwise the skip/hint buttons would jump when the mic starts. */
 .spoken-line {
   display: none;
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 0;
+  right: 0;
   min-height: 1.5em;
-  margin-top: 12px;
   padding: 0 62px 0 14px;
   font-size: 26px;
   line-height: 1.4;
