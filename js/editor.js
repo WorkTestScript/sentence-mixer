@@ -396,7 +396,7 @@ function selectSearchResult(resultIndex) {
    ============================================================ */
 
 increaseBtn.addEventListener("click", () => {
-  sectionCount = sectionCount >= 20 ? 1 : sectionCount + 1
+  sectionCount = sectionCount >= 10 ? 1 : sectionCount + 1
   while (inputData.length < sectionCount) inputData.push({})
   increaseBtn.textContent = `+ ${sectionCount}`
   renderForm()

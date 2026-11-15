@@ -8,13 +8,19 @@
   flex-direction: column;
 }
 
+.load-replace-modal {
+  overflow-y: auto;
+}
+
 .load-replace-modal .modal-content {
-  width: min(760px, 100%);
+  width: min(1000px, 100%);
+  max-width: min(1000px, 100%);
+  margin: auto;
 }
 
 .load-options-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
 }
 
@@ -36,6 +42,10 @@
 .load-option-card p {
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.load-option-card > button {
+  margin-top: auto;
 }
 
 .file-picker {

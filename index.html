@@ -20,8 +20,8 @@
             <li><a href="index.html" class="active">Тренування</a></li>
             <li><a href="pages/editor.html">Редактор</a></li>
             <li><button id="list-open-modal-btn" class="list-open-modal">Список</button></li>
-            <li><button class="load-replace-open-modal">Завантажити файл</button></li>
-            <li><button class="save-selected-open-modal">Зберегти вибране</button></li>
+            <li><button class="load-replace-open-modal">Додати список</button></li>
+            <li><button class="save-selected-open-modal">Вибране</button></li>
         </ul>
     </nav>
 
@@ -116,12 +116,12 @@
 
     <div class="load-replace-modal modal">
         <div class="modal-content">
-            <h3>Завантажити список речень</h3>
+            <h3>Додати список речень</h3>
             <div class="load-options-grid">
                 <section class="load-option-card">
-                    <h4>Завантажити створений список</h4>
-                    <p id="created-list-load-status">Список із розділу «Створити список» буде використано для тренування.</p>
-                    <button id="load-created-list-btn" type="button">Завантажити створений список</button>
+                    <h4>Завантажити список з редактора</h4>
+                    <p id="created-list-load-status">Список, створений на сторінці «Редактор», буде використано для тренування.</p>
+                    <button id="load-created-list-btn" type="button">Завантажити список з редактора</button>
                 </section>
                 <section class="load-option-card">
                     <h4>Завантажити список з файлу</h4>
@@ -131,6 +131,11 @@
                         <label class="file-picker-button" for="training-list-file">Вибрати файл</label>
                         <span id="training-list-file-name">Файл не вибрано</span>
                     </div>
+                </section>
+                <section class="load-option-card">
+                    <h4>Завантажити список вибраних рядків</h4>
+                    <p id="selected-list-load-status">Речення, додані до вибраного (♥), буде використано для тренування.</p>
+                    <button id="load-selected-list-btn" type="button">Завантажити список вибраних рядків</button>
                 </section>
             </div>
             <div class="modal-control">
@@ -144,8 +149,20 @@
             <h3>Зберегти вибрані речення</h3>
             <input type="text" id="file-name" placeholder="File name">
             <div class="modal-control">
-                <button id="save-selected-to-file-btn" data-storage="saveSelected">Зберегти</button>
-                <button class="close-modal-btn">Скасувати</button>
+                <button class="close-modal-btn" type="button">Скасувати</button>
+                <button id="clear-selected-btn" type="button">Очистити</button>
+                <button id="save-selected-to-file-btn" type="button" data-storage="saveSelected">Зберегти</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="clear-selected-modal modal">
+        <div class="modal-content">
+            <h3>Очистити вибране?</h3>
+            <p id="clear-selected-modal-text">Усі речення зі списку вибраних буде видалено.</p>
+            <div class="modal-control">
+                <button id="clear-selected-cancel-btn" type="button">Скасувати</button>
+                <button id="clear-selected-confirm-btn" type="button">Очистити</button>
             </div>
         </div>
     </div>

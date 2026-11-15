@@ -46,6 +46,7 @@
 
   const closeInformationModal = () => hideModal($(".information-modal"))
   const closeSaveModal = () => hideModal($(".save-modal"))
+  const closeClearSelectedModal = () => hideModal($(".clear-selected-modal"))
   const closeLoadReplaceModal = () => hideModal($(".load-replace-modal"))
   const closeLoadMergeModal = () => hideModal($(".load-merge-modal"))
   const closeJsonConfirmationModal = () => hideModal($(".json-confirmation-modal"))
@@ -62,8 +63,22 @@
   }
 
   const showSaveModal = () => showModal($(".save-modal"))
+  const showClearSelectedModal = () => {
+    const saved = readStorage(STORAGE_KEYS.saved)
+    if (!saved.length) {
+      closeSaveModal()
+      showInformationModal("Список вибраних порожній")
+      return
+    }
+    const text = $("#clear-selected-modal-text")
+    if (text) {
+      text.textContent = `Усі речення зі списку вибраних (${saved.length}) буде видалено.`
+    }
+    showModal($(".clear-selected-modal"))
+  }
   const showLoadReplaceModal = () => {
     updateCreatedListLoadButton()
+    updateSelectedListLoadButton()
     showModal($(".load-replace-modal"))
   }
   const showLoadMergeModal = () => showModal($(".load-merge-modal"))
@@ -101,14 +116,23 @@
           saveBtn.disabled = !hasItems
         }
       }
+
+      const clearBtn = $("#clear-selected-btn")
+      if (clearBtn) {
+        clearBtn.disabled = !hasItems
+      }
     } catch (e) {
       console.error("Error updating save button state:", e)
     }
   }
 
   window.addEventListener("saveSelectedChanged", updateSaveSelectedButtonState)
+  window.addEventListener("saveSelectedChanged", updateSelectedListLoadButton)
   window.addEventListener("storage", (e) => {
-    if (e.key === STORAGE_KEYS.saved) updateSaveSelectedButtonState()
+    if (e.key === STORAGE_KEYS.saved) {
+      updateSaveSelectedButtonState()
+      updateSelectedListLoadButton()
+    }
   })
 
   /* ---------- File load (replace / merge) ---------- */
@@ -177,21 +201,47 @@
     const created = readStorage(STORAGE_KEYS.created)
     button.disabled = created.length === 0
     status.textContent = created.length
-      ? `Знайдено ${created.length} речень у списку зі сторінки «Створити список».`
-      : "На сторінці «Створити список» ще немає збережених речень."
+      ? `Знайдено ${created.length} речень у списку зі сторінки «Редактор».`
+      : "На сторінці «Редактор» ще немає збережених речень."
+  }
+
+  function updateSelectedListLoadButton() {
+    const button = $("#load-selected-list-btn")
+    const status = $("#selected-list-load-status")
+    if (!button || !status) return
+
+    const saved = readStorage(STORAGE_KEYS.saved)
+    button.disabled = saved.length === 0
+    status.textContent = saved.length
+      ? `Знайдено ${saved.length} вибраних речень.`
+      : "Ще немає вибраних речень. Додайте їх кнопкою ♥ у списку."
   }
 
   function loadCreatedListForTraining() {
     const created = readStorage(STORAGE_KEYS.created)
     if (!created.length) {
-      showInformationModal("Спочатку створіть або завантажте список на сторінці «Створити список».")
+      showInformationModal("Спочатку створіть або завантажте список на сторінці «Редактор».")
       return
     }
 
     writeStorage(STORAGE_KEYS.sentences, normalizeDataFormat(created))
     localStorage.removeItem(STORAGE_KEYS.used)
     closeLoadReplaceModal()
-    showInformationModal("Створений список завантажено для тренування.")
+    showInformationModal("Список з редактора завантажено для тренування.")
+    setTimeout(() => location.reload(), 900)
+  }
+
+  function loadSelectedListForTraining() {
+    const saved = readStorage(STORAGE_KEYS.saved)
+    if (!saved.length) {
+      showInformationModal("Спочатку додайте речення до вибраного кнопкою ♥.")
+      return
+    }
+
+    writeStorage(STORAGE_KEYS.sentences, normalizeDataFormat(saved))
+    localStorage.removeItem(STORAGE_KEYS.used)
+    closeLoadReplaceModal()
+    showInformationModal("Список вибраних рядків завантажено для тренування.")
     setTimeout(() => location.reload(), 900)
   }
 
@@ -246,6 +296,17 @@
       window.dispatchEvent(new Event("saveSelectedChanged"))
       updateSaveSelectedButtonState()
     }
+  }
+
+  /* ---------- Clear selected list ---------- */
+
+  function clearSelectedList() {
+    localStorage.removeItem(STORAGE_KEYS.saved)
+    closeClearSelectedModal()
+    closeSaveModal()
+    window.dispatchEvent(new Event("saveSelectedChanged"))
+    updateSaveSelectedButtonState()
+    showInformationModal("Список вибраних очищено")
   }
 
   /* ---------- JSON clipboard (edit / add) ---------- */
@@ -474,6 +535,7 @@
       if (!modal) return
       if (modal.classList.contains("information-modal")) closeInformationModal()
       else if (modal.classList.contains("save-modal")) closeSaveModal()
+      else if (modal.classList.contains("clear-selected-modal")) closeClearSelectedModal()
       else if (modal.classList.contains("load-replace-modal")) closeLoadReplaceModal()
       else if (modal.classList.contains("load-merge-modal")) closeLoadMergeModal()
       else if (modal.classList.contains("json-confirmation-modal")) closeJsonConfirmationModal()
@@ -498,9 +560,13 @@
 
   $(".load-replace-open-modal")?.addEventListener("click", showLoadReplaceModal)
   $("#load-created-list-btn")?.addEventListener("click", loadCreatedListForTraining)
+  $("#load-selected-list-btn")?.addEventListener("click", loadSelectedListForTraining)
   $(".load-merge-open-modal")?.addEventListener("click", showLoadMergeModal)
   $(".save-selected-open-modal")?.addEventListener("click", showSaveModal)
   $("#save-selected-to-file-btn")?.addEventListener("click", saveToFile)
+  $("#clear-selected-btn")?.addEventListener("click", showClearSelectedModal)
+  $("#clear-selected-confirm-btn")?.addEventListener("click", clearSelectedList)
+  $("#clear-selected-cancel-btn")?.addEventListener("click", closeClearSelectedModal)
 
   $$(".file-input").forEach((input) => {
     input.addEventListener("change", handleFileSelect)
@@ -520,12 +586,15 @@
   window.closeModal = closeModal
   window.closeInformationModal = closeInformationModal
   window.closeSaveModal = closeSaveModal
+  window.closeClearSelectedModal = closeClearSelectedModal
   window.closeLoadReplaceModal = closeLoadReplaceModal
   window.closeLoadMergeModal = closeLoadMergeModal
   window.closeJsonConfirmationModal = closeJsonConfirmationModal
   window.closeJsonAddConfirmationModal = closeJsonAddConfirmationModal
   window.showInformationModal = showInformationModal
   window.showSaveModal = showSaveModal
+  window.showClearSelectedModal = showClearSelectedModal
+  window.clearSelectedList = clearSelectedList
   window.showLoadReplaceModal = showLoadReplaceModal
   window.showLoadMergeModal = showLoadMergeModal
   window.showJsonConfirmationModal = showJsonConfirmationModal
