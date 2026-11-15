@@ -398,6 +398,13 @@
   margin: 24px auto 0;
 }
 
+/* When the voice-commands block is hidden (no speech recognition), keep the
+   remaining block at the same half-width and centred. */
+.info-row--single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: calc((640px - 18px) / 2);
+}
+
 .shortcuts-info,
 .voice-commands-info {
   min-width: 0;
@@ -423,19 +430,23 @@
   list-style: none;
   padding: 0;
   font-size: 14px;
+  /* One shared grid for all rows, so the key/command column starts at the
+     same x on every line. */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  row-gap: 8px;
+  column-gap: 10px;
 }
 
 .shortcuts-info li,
 .voice-commands-info li {
-  margin-bottom: 8px;
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 10px;
+  display: contents;
 }
 
 .shortcuts-info span,
 .voice-commands-info span {
+  justify-self: start;
   font-weight: 700;
   color: var(--chip-text);
   background: var(--chip-bg);

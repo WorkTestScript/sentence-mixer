@@ -201,12 +201,34 @@ function runVoiceCommand(text) {
 }
 
 // Initialize Speech Recognition (called once on page load)
+
+/**
+ * Chromium-based browsers expose the SpeechRecognition API even when the
+ * online service behind it is unavailable - Opera is the known case, where
+ * the mic button exists but recognition never returns anything. Treat those
+ * as unsupported, exactly like a browser without the API at all.
+ */
+function isVoiceRecognitionSupported() {
+  if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) return false
+  if (window.opr || /\bOPR\/|\bOpera\b/i.test(navigator.userAgent || '')) return false
+  return true
+}
+
+// Hides every piece of voice-input UI when the browser cannot recognise
+// speech. The microphone logic itself is left untouched.
+function hideVoiceFeatures() {
+  if (voiceInputBtn) voiceInputBtn.classList.add('hide')
+  const voiceCommandsInfo = document.querySelector('.voice-commands-info')
+  if (!voiceCommandsInfo) return
+  voiceCommandsInfo.classList.add('hide')
+  const infoRow = voiceCommandsInfo.closest('.info-row')
+  if (infoRow) infoRow.classList.add('info-row--single')
+}
+
 function initSpeechRecognition() {
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+  if (!isVoiceRecognitionSupported()) {
     console.warn('Speech recognition not supported in this browser')
-    if (voiceInputBtn) {
-      voiceInputBtn.style.display = 'none'
-    }
+    hideVoiceFeatures()
     return
   }
 
