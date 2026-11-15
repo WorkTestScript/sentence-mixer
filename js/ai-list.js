@@ -1,8 +1,8 @@
 ;(() => {
   const LIST_STORAGE = "createdSentences"
   const providers = {
-    google: { label: "Gemini", key: "geminiApiKey", url: "https://aistudio.google.com/app/apikey", help: "Ключ зберігається лише у localStorage цього браузера. <a href=\"https://aistudio.google.com/app/apikey\" target=\"_blank\" rel=\"noopener noreferrer\">Отримати API key у Google AI Studio</a>" },
-    groq: { label: "Groq", key: "groqApiKey", url: "https://console.groq.com/keys", help: "Ключ зберігається лише у localStorage цього браузера. <a href=\"https://console.groq.com/keys\" target=\"_blank\" rel=\"noopener noreferrer\">Створити API key у Groq Console</a>" },
+    google: { label: "Gemini", key: "geminiApiKey", url: "https://aistudio.google.com/app/apikey", help: '<span class="ai-key-note">Ключ зберігається лише у localStorage цього браузера.</span><a class="ai-key-link" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer"><span class="ai-key-link-text">Отримати API key у Google AI Studio</span><span class="ai-key-link-icon" aria-hidden="true">↗</span></a>' },
+    groq: { label: "Groq", key: "groqApiKey", url: "https://console.groq.com/keys", help: '<span class="ai-key-note">Ключ зберігається лише у localStorage цього браузера.</span><a class="ai-key-link" href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer"><span class="ai-key-link-text">Створити API key у Groq Console</span><span class="ai-key-link-icon" aria-hidden="true">↗</span></a>' },
   }
   const modal = document.getElementById("ai-list-modal")
   const apiKeyModal = document.getElementById("ai-api-key-modal")

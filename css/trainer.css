@@ -390,10 +390,17 @@
   font-weight: 700;
 }
 
-.shortcuts-info,
-.voice-commands-info {
+.info-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
   max-width: 640px;
   margin: 24px auto 0;
+}
+
+.shortcuts-info,
+.voice-commands-info {
+  min-width: 0;
   text-align: left;
   padding: 16px 20px;
   background: var(--bg-elevated-2);
@@ -422,7 +429,7 @@
 .voice-commands-info li {
   margin-bottom: 8px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   gap: 10px;
 }
@@ -436,6 +443,12 @@
   border-radius: 6px;
   font-size: 13px;
   white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .info-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Settings toggle button (corner group, before the repeat button) */

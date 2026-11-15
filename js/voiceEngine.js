@@ -25,9 +25,17 @@
  * trick needed.
  */
 const GOOGLE_VOICES = [
-  { id: "google-en-GB", label: "Google (British English)", locale: "en-GB" },
   { id: "google-en-US", label: "Google (American English)", locale: "en-US" },
+  { id: "google-en-GB", label: "Google (British English)", locale: "en-GB" },
 ]
+
+// Voice used when the user has not chosen one: American English.
+const DEFAULT_VOICE_ID = "google-en-US"
+
+// Older builds shipped the British voice as the implicit default and saved
+// it whenever any voice slider changed. Move that legacy default to the new
+// American one once; an explicit choice made afterwards is kept as is.
+const VOICE_DEFAULT_MIGRATION_KEY = "voiceDefaultMigration"
 
 // Google's TTS endpoint silently truncates or rejects very long requests
 // (historically, right around 100 characters). Text longer than this is
@@ -133,8 +141,17 @@ class VoiceEngine {
    */
   loadVoiceSettings() {
     if (!this.isInitialized) return;
-    
-    this.voiceSelect.value = localStorage.getItem("voice") || this.voiceSelect.value;
+
+    const storedVoice = localStorage.getItem("voice")
+    if (storedVoice === "google-en-GB" && !localStorage.getItem(VOICE_DEFAULT_MIGRATION_KEY)) {
+      localStorage.setItem("voice", DEFAULT_VOICE_ID)
+      localStorage.setItem(VOICE_DEFAULT_MIGRATION_KEY, DEFAULT_VOICE_ID)
+    }
+
+    const savedVoice = localStorage.getItem("voice")
+    const hasSavedVoice =
+      !!savedVoice && [...this.voiceSelect.options].some((option) => option.value === savedVoice)
+    this.voiceSelect.value = hasSavedVoice ? savedVoice : DEFAULT_VOICE_ID
     this.speedControl.value = localStorage.getItem("speed") || 1;
     this.pitchControl.value = localStorage.getItem("pitch") || 1;
     this.volumeControl.value = localStorage.getItem("volume") || 1;

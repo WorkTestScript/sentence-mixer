@@ -182,6 +182,7 @@ button:disabled {
 input[type="text"],
 input[type="search"],
 input[type="file"],
+input[type="password"],
 textarea,
 select {
   width: 100%;
