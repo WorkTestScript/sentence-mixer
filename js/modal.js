@@ -319,12 +319,30 @@
           clipboardText = await navigator.clipboard.readText()
         }
       } catch (clipboardError) {
+        // Fallback for browsers that do not allow reading the clipboard
+        // directly. The textarea is fixed at the top of the viewport and
+        // focus() does not scroll, so reading the clipboard never jumps the
+        // page to the bottom (which used to happen when it was appended at
+        // the end of the body and focused).
+        const scrollX = window.scrollX
+        const scrollY = window.scrollY
         const textarea = document.createElement("textarea")
+        textarea.style.position = "fixed"
+        textarea.style.top = "0"
+        textarea.style.left = "0"
+        textarea.style.width = "1px"
+        textarea.style.height = "1px"
+        textarea.style.opacity = "0"
+        textarea.style.pointerEvents = "none"
         document.body.appendChild(textarea)
-        textarea.focus()
-        document.execCommand("paste")
-        clipboardText = textarea.value
-        document.body.removeChild(textarea)
+        try {
+          textarea.focus({ preventScroll: true })
+          document.execCommand("paste")
+          clipboardText = textarea.value
+        } finally {
+          document.body.removeChild(textarea)
+          window.scrollTo(scrollX, scrollY)
+        }
       }
 
       if (!clipboardText.trim()) throw new Error("Буфер обміну порожній")
@@ -466,6 +484,10 @@
     textarea.value = text
     textarea.setAttribute("readonly", "")
     textarea.style.position = "fixed"
+    textarea.style.top = "0"
+    textarea.style.left = "0"
+    textarea.style.width = "1px"
+    textarea.style.height = "1px"
     textarea.style.opacity = "0"
     document.body.appendChild(textarea)
     textarea.select()

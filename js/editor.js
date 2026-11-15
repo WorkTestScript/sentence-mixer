@@ -444,13 +444,6 @@ $("#search-suggestions-close")?.addEventListener("click", () => {
 })
 
 document.addEventListener("keydown", (e) => {
-  if (e.ctrlKey && e.altKey) {
-    if (editModal.style.display === "flex") return
-    e.preventDefault()
-    searchInput.focus()
-    searchInput.select()
-  }
-
   if (e.key === "ArrowUp") window.scrollBy(0, -window.innerHeight)
   if (e.key === "ArrowDown") window.scrollBy(0, window.innerHeight)
 })
