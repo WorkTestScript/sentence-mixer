@@ -625,6 +625,7 @@
   window.showJsonActionModal = showJsonActionModal
   window.closeJsonActionModal = closeJsonActionModal
   window.handleJsonAddClipboard = handleJsonAddClipboard
+  window.copyTextToClipboard = copyTextToClipboard
   window.confirmJsonReplacement = confirmJsonReplacement
   window.cancelJsonReplacement = cancelJsonReplacement
   window.confirmJsonAdd = confirmJsonAdd

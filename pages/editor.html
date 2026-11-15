@@ -107,8 +107,42 @@
             <div class="modal-control">
                 <button id="ai-list-cancel" type="button">Скасувати</button>
                 <button id="ai-api-key-open" type="button">API key</button>
+                <button id="ai-prompt-open" type="button">Prompt</button>
                 <button id="ai-list-generate" type="button">Генерувати</button>
             </div>
+        </div>
+    </div>
+
+    <div id="ai-prompt-modal" class="modal ai-prompt-modal" role="dialog" aria-modal="true" aria-labelledby="ai-prompt-title">
+        <div class="modal-content">
+            <div class="ai-prompt-header">
+                <h3 id="ai-prompt-title">Prompt</h3>
+                <div class="ai-prompt-header-actions">
+                    <button id="ai-prompt-format-open" class="ai-prompt-format-open" type="button">Показати</button>
+                    <button id="ai-prompt-copy" class="ai-prompt-copy" type="button" title="Копіювати повний промт" aria-label="Копіювати повний промт">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <label for="ai-prompt-text">Додаткові властивості</label>
+            <textarea id="ai-prompt-text" class="ai-prompt-text" rows="8"></textarea>
+            <p id="ai-prompt-status" class="ai-prompt-status" role="status" aria-live="polite"></p>
+            <div class="modal-control">
+                <button id="ai-prompt-reset" type="button">Скинути до початкового</button>
+                <button id="ai-prompt-close" type="button">Закрити</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ai-prompt-format-modal" class="modal ai-prompt-format-modal" role="dialog" aria-modal="true" aria-labelledby="ai-prompt-format-title">
+        <div class="modal-content">
+            <div class="ai-prompt-format-header">
+                <h3 id="ai-prompt-format-title">Формат промту</h3>
+                <button id="ai-prompt-format-close" class="ai-prompt-format-close" type="button" title="Закрити" aria-label="Закрити">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="ai-prompt-format-text" class="ai-prompt-format-text" tabindex="0"></div>
         </div>
     </div>
 

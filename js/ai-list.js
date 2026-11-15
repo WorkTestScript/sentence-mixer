@@ -20,6 +20,17 @@
   const keyLabel = document.querySelector('label[for="ai-api-key"]')
   const keyHelp = document.getElementById("ai-key-help")
   const status = document.getElementById("ai-list-status")
+  const promptModal = document.getElementById("ai-prompt-modal")
+  const openPromptButton = document.getElementById("ai-prompt-open")
+  const promptText = document.getElementById("ai-prompt-text")
+  const promptFormatModal = document.getElementById("ai-prompt-format-modal")
+  const openFormatButton = document.getElementById("ai-prompt-format-open")
+  const promptFormatText = document.getElementById("ai-prompt-format-text")
+  const closeFormatButton = document.getElementById("ai-prompt-format-close")
+  const promptStatus = document.getElementById("ai-prompt-status")
+  const copyPromptButton = document.getElementById("ai-prompt-copy")
+  const resetPromptButton = document.getElementById("ai-prompt-reset")
+  const closePromptButton = document.getElementById("ai-prompt-close")
   let isGenerating = false
   if (!modal || !openButton) return
 
@@ -56,6 +67,46 @@
   })
   cancelApiKeyButton.addEventListener("click", () => { syncProvider(); apiKeyModal.style.display = "none" })
   apiKeyModal.addEventListener("click", (event) => { if (event.target === apiKeyModal) apiKeyModal.style.display = "none" })
+
+  /* ---------- Prompt customization ----------
+     The JSON format and the object structure are fixed in code and are
+     always added to the request, so editing the prompt can change only the
+     user's own wishes, never the response format. */
+  openPromptButton?.addEventListener("click", () => {
+    promptText.value = getUserPrompt()
+    if (promptStatus) promptStatus.textContent = ""
+    promptModal.style.display = "flex"
+    promptText.focus({ preventScroll: true })
+  })
+  promptText?.addEventListener("input", () => {
+    saveUserPrompt()
+    if (promptStatus) promptStatus.textContent = ""
+  })
+  resetPromptButton?.addEventListener("click", () => {
+    localStorage.removeItem(PROMPT_STORAGE)
+    promptText.value = DEFAULT_PROMPT
+    if (promptStatus) promptStatus.textContent = "Промт повернуто до початкового стану."
+  })
+  copyPromptButton?.addEventListener("click", async () => {
+    const fullPrompt = buildPromptForCopy()
+    const copied = typeof copyTextToClipboard === "function"
+      ? await copyTextToClipboard(fullPrompt)
+      : false
+    if (promptStatus) promptStatus.textContent = copied ? "Повний промт скопійовано." : "Не вдалося скопіювати промт."
+  })
+  closePromptButton?.addEventListener("click", () => { promptModal.style.display = "none" })
+  promptModal?.addEventListener("click", (event) => { if (event.target === promptModal) promptModal.style.display = "none" })
+
+  /* The fixed response format is shown in its own window, so the editable
+     prompt stays compact and the format itself can only be read. */
+  openFormatButton?.addEventListener("click", () => {
+    if (promptFormatText) promptFormatText.textContent = formatPrompt(entriesFromInput().length || 1)
+    promptFormatModal.style.display = "flex"
+    closeFormatButton?.focus({ preventScroll: true })
+  })
+  closeFormatButton?.addEventListener("click", () => { promptFormatModal.style.display = "none" })
+  promptFormatModal?.addEventListener("click", (event) => { if (event.target === promptFormatModal) promptFormatModal.style.display = "none" })
+
   updateOverflowHighlight(); syncGenerateButton()
   modal.addEventListener("click", (event) => { if (event.target === modal) closeModal() })
 
@@ -116,17 +167,61 @@
     } finally { isGenerating = false; syncGenerateButton() }
   })
 
-  function buildPrompt(entries) {
-    return `Створи JSON-масив рівно з ${entries.length} об'єктів — по одному для кожного рядка вхідного списку, у тому самому порядку. Поверни тільки валідний JSON без markdown, коментарів і тексту поза JSON. Кожен об'єкт має містити рівно три рядкові властивості в такому форматі: {"en":"англійське слово або фраза","ua":"переклад (короткий опис контексту або значення)","example":"Two English sentences."}. Не додавай інших полів чи вкладених масивів або об'єктів.
-
-Вимоги до кожного об'єкта:
+  /* ---------- Prompt text ----------
+     DEFAULT_PROMPT is the built-in user-editable part of the prompt. The
+     response format lives in formatPrompt() and is always prepended, so it
+     cannot be changed or removed from the prompt modal. */
+  const PROMPT_STORAGE = "aiListPrompt"
+  const DEFAULT_PROMPT = `Вимоги до кожного об'єкта:
 - "en" — точний англійський текст із відповідного рядка, без змін.
 - "ua" — спочатку український переклад, потім пробіл і короткий опис у круглих дужках. Якщо слово має кілька поширених значень, наведи найуживаніші переклади та стисло поясни кожне значення. Якщо слово може бути іменником і прикметником, вкажи обидва значення. Пиши просто, без слів «використовується», «застосовується», «вживається» та подібних. Не використовуй знак /; розділяй значення комами або крапкою з комою.
-- "example" — один суцільний рядок англійською. Додай два прості речення для кожного вказаного значення; кожне речення має містити саме це слово або фразу. Розділяй речення пробілом. Якщо значення одне, наведи рівно два речення.
-- Дотримуйся саме цих трьох властивостей і цього формату. Не додавай trailing comma.
+- "example" — один суцільний рядок англійською. Додай два прості речення для кожного вказаного значення; кожне речення має містити саме це слово або фразу. Розділяй речення пробілом. Якщо значення одне, наведи рівно два речення.`
+
+  const FORMAT_REMINDER = 'Формат відповіді зафіксований: поверни лише JSON-масив об\'єктів із властивостями "en", "ua", "example" — без інших полів.'
+
+  function formatPrompt(count) {
+    return `Створи JSON-масив рівно з ${count} об'єктів — по одному для кожного рядка вхідного списку, у тому самому порядку. Поверни тільки валідний JSON без markdown, коментарів і тексту поза JSON. Кожен об'єкт має містити рівно три рядкові властивості в такому форматі: {"en":"англійське слово або фраза","ua":"переклад (короткий опис контексту або значення)","example":"Two English sentences."}. Не додавай інших полів чи вкладених масивів або об'єктів. Не додавай trailing comma.`
+  }
+
+  function getUserPrompt() {
+    const stored = localStorage.getItem(PROMPT_STORAGE)
+    return stored && stored.trim() ? stored : DEFAULT_PROMPT
+  }
+
+  function saveUserPrompt() {
+    if (!promptText) return
+    const value = promptText.value
+    if (!value.trim() || value.trim() === DEFAULT_PROMPT.trim()) {
+      localStorage.removeItem(PROMPT_STORAGE)
+    } else {
+      localStorage.setItem(PROMPT_STORAGE, value)
+    }
+  }
+
+  function buildPrompt(entries) {
+    return `${formatPrompt(entries.length)}
+
+${getUserPrompt()}
+
+${FORMAT_REMINDER}
 
 Вхідний список:
 ${entries.map((entry, index) => `${index + 1}. ${entry}`).join("\n")}`
+  }
+
+  // The prompt that the copy button puts on the clipboard: the fixed format,
+  // the user's wishes and, when words are already entered, the input list.
+  function buildPromptForCopy() {
+    const entries = entriesFromInput()
+    const count = entries.length || 1
+    const list = entries.length
+      ? `\n\nВхідний список:\n${entries.map((entry, index) => `${index + 1}. ${entry}`).join("\n")}`
+      : ""
+    return `${formatPrompt(count)}
+
+${getUserPrompt()}
+
+${FORMAT_REMINDER}${list}`
   }
   function entriesFromInput() { return input.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) }
   function syncGenerateButton() { generateButton.disabled = isGenerating || entriesFromInput().length > 50 }
